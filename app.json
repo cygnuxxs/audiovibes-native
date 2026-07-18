@@ -8,35 +8,106 @@
     "scheme": "audiovibes",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.cygnuxxs.audiovibes"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/images/adaptive-icon-background.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.cygnuxxs.audiovibes",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
+      ]
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/GoogleSans-Regular.ttf",
+            "./assets/fonts/GoogleSans-Medium.ttf",
+            "./assets/fonts/GoogleSans-SemiBold.ttf",
+            "./assets/fonts/GoogleSans-Bold.ttf"
+          ],
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "GoogleSans",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/GoogleSans-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              },
+              {
+                "fontFamily": "GoogleSans Medium",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/GoogleSans-Medium.ttf",
+                    "weight": 500
+                  }
+                ]
+              },
+              {
+                "fontFamily": "GoogleSans SemiBold",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/GoogleSans-SemiBold.ttf",
+                    "weight": 600
+                  }
+                ]
+              },
+              {
+                "fontFamily": "GoogleSans Bold",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/GoogleSans-Bold.ttf",
+                    "weight": 700
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "expo-file-system",
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/android-splash-light.png",
+          "imageWidth": 220,
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/images/android-splash-dark.png",
+            "imageWidth": 220
+          }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dc928e3e-86c8-4f7f-bbe7-32bc47a2fe35"
+      }
     }
   }
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "writer"
+  ],
+  "ios": {
+    "iosModuleName": "NitroWriter"
+  },
+  "android": {
+    "androidNamespace": [
+      "writer"
+    ],
+    "androidCxxLibName": "NitroWriter"
+  },
+  "autolinking": {
+    "Writer": {
+      "all": {
+        "language": "c++",
+        "implementationClassName": "HybridWriter"
+      }
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

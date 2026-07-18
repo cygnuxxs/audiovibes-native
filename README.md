@@ -1,56 +1,69 @@
-# Welcome to your Expo app 👋
+# AudioVibes 🎧
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+AudioVibes is a modern, personalized music sanctuary built with React Native and Expo. It offers an immersive offline and online listening experience with sleek, dynamic visuals.
 
-## Get started
+## Features ✨
 
-1. Install dependencies
+- **Music Playback**: Built with React Native Track Player for robust background audio processing.
+- **Offline Mode**: Download your favorite tracks to your device and manage local storage securely.
+- **Dynamic Theming**: Support for stunning Light and Dark modes with custom colors using NativeWind.
+- **Modern UI Components**: Sleek buttons, wave progress indicators, bottom sheets, and interactive layouts.
+- **Offline Storage Management**: Integrates easily with your device folders (Storage Access Framework on Android).
 
+## Tech Stack 🛠
+
+- **Framework**: [React Native](https://reactnative.dev) & [Expo](https://expo.dev)
+- **Audio Engine**: [React Native Track Player](https://react-native-track-player.js.org/)
+- **Styling**: [NativeWind](https://www.nativewind.dev/) (Tailwind CSS for React Native)
+- **State Management**: [Zustand](https://github.com/pmndrs/zustand)
+- **Data Fetching**: [TanStack React Query](https://tanstack.com/query)
+- **Icons**: [Lucide React Native](https://lucide.dev/)
+
+## Getting Started 🚀
+
+### Prerequisites
+
+Make sure you have Node.js and npm/yarn/pnpm installed.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/cygnuxxs/audiovibes-native.git
+   ```
+2. Navigate to the project directory:
+   ```bash
+   cd audiovibes-native
+   ```
+3. Install dependencies:
    ```bash
    npm install
+   # or
+   pnpm install
    ```
 
-2. Start the app
+### Running the App
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Start the Expo development server:
 
 ```bash
-npm run reset-project
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+For Android:
+```bash
+npx expo run:android
+```
 
-### Other setup steps
+For iOS:
+```bash
+npx expo run:ios
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Release APK 📦
 
-## Learn more
+A pre-built Android APK is included in the project for easy installation: [`app-release.apk`](./app-release.apk).
 
-To learn more about developing your project with Expo, look at the following resources:
+## License 📄
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is licensed under the terms of the MIT license.
