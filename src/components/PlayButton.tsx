@@ -72,7 +72,7 @@ export default function PlayButton({ song, songUrl, songId, color, primaryColor 
       url: songUrl,
       title: song.title,
       artist: song.music,
-      artwork: song.image,
+      artwork: song.image.replace('-50x50', '-500x500'),
     });
   }, [toggle, songId, songUrl, song]);
 

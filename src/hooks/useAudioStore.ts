@@ -40,8 +40,9 @@ export const useAudioStore = create<AudioState>((set, get) => {
 
     toggle: async (track) => {
       const currentTrack = TrackPlayer.getActiveMediaItem();
+      const isDifferentTrack = currentTrack?.mediaId !== track.id;
 
-      if (currentTrack?.mediaId !== track.id) {
+      if (isDifferentTrack) {
         TrackPlayer.setMediaItem({
           mediaId: track.id,
           url: track.url,
@@ -49,6 +50,9 @@ export const useAudioStore = create<AudioState>((set, get) => {
           artist: track.artist || "Unknown Artist",
           artworkUrl: track.artwork,
         });
+
+        TrackPlayer.play();
+        return;
       }
 
       const isPlaying = TrackPlayer.isPlaying();
@@ -57,10 +61,10 @@ export const useAudioStore = create<AudioState>((set, get) => {
       } else {
         let state;
         try {
-          const playbackState = await TrackPlayer.getPlaybackState() as any;
+          const playbackState = TrackPlayer.getPlaybackState() as any;
           state = playbackState?.state ?? playbackState;
         } catch (e) {
-           // fallback if method fails
+          // fallback if method fails
         }
         if (state === PlaybackState.Ended) {
           TrackPlayer.seekTo(0);
