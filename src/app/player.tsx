@@ -1,0 +1,154 @@
+import { useCallback, useEffect } from "react";
+import { View, Image, Dimensions, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import TrackPlayer, { useActiveMediaItem, useIsPlaying, useProgress } from "@rntp/player";
+import { Disc3, Globe, Zap, Award, Calendar, Headphones, Music2 } from "lucide-react-native";
+import { useAudioStore } from "@/hooks/useAudioStore";
+import { useActiveColors } from "@/hooks/useActiveColors";
+import { useSharedValue } from "react-native-reanimated";
+import { ScrollView } from "react-native";
+
+import { PlayerHeader } from "@/components/player/PlayerHeader";
+import { PlayerArtwork } from "@/components/player/PlayerArtwork";
+import { PlayerTrackInfo } from "@/components/player/PlayerTrackInfo";
+import { PlayerSeekBar } from "@/components/player/PlayerSeekBar";
+import { PlayerControls } from "@/components/player/PlayerControls";
+import { PlayerInfoChips } from "@/components/player/PlayerInfoChips";
+import { PlayerArtistsSection } from "@/components/player/PlayerArtistsSection";
+import { PlayerReleaseInfo } from "@/components/player/PlayerReleaseInfo";
+import { formatPlayCount, formatDuration } from "@/lib/playerUtils";
+
+export default function PlayerScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const activeMedia = useActiveMediaItem();
+  const isPlaying = useIsPlaying();
+  const progress = useProgress(250);
+  const audioStore = useAudioStore();
+  const activeColors = useActiveColors();
+
+  // Shared values passed down to PlayerSeekBar
+  const positionSV = useSharedValue(0);
+  const durationSV = useSharedValue(0);
+  const sliderWidth = useSharedValue(1);
+  const isSeeking = useSharedValue(false);
+
+  // Sync JS progress → shared values (only when not seeking)
+  useEffect(() => {
+    if (!isSeeking.value) {
+      positionSV.value = progress.position;
+    }
+  }, [progress.position, isSeeking]);
+
+  useEffect(() => {
+    durationSV.value = progress.duration;
+  }, [progress.duration, durationSV]);
+
+  const displayMedia = activeMedia || audioStore.activeTrack;
+  const track = audioStore.activeTrack;
+
+  const handlePlayPause = useCallback(async () => {
+    if (isPlaying) {
+      TrackPlayer.pause();
+    } else {
+      TrackPlayer.play();
+    }
+  }, [isPlaying]);
+
+  const handleSeek = useCallback((position: number) => {
+    TrackPlayer.seekTo(position);
+  }, []);
+
+  // ── Derived metadata ────────────────────────────────────────────────────────
+  const artworkUri = (displayMedia as any)?.artworkUrl || (displayMedia as any)?.artwork;
+  const title = (displayMedia as any)?.title || "Not Playing";
+  const primaryArtist = (displayMedia as any)?.artist || track?.music || "Unknown Artist";
+
+  const album = track?.album;
+  const year = track?.year;
+  const language = track?.language;
+  const label = track?.label;
+  const music = track?.music;
+  const releaseDate = track?.release_date;
+  const playCount = formatPlayCount(track?.play_count);
+  const isHQ = track?.kbps_320 === "true" || track?.kbps_320 === "1";
+  const isExplicit = track?.explicit_content === "true" || track?.explicit_content === "1";
+  const copyright = track?.copyright_text;
+  const artists = track?.artists ?? [];
+  const duration = progress.duration;
+
+  const chips: { icon: any; label: string; value: string }[] = [];
+  if (album) chips.push({ icon: Disc3, label: "Album", value: album });
+  if (year) chips.push({ icon: Calendar, label: "Year", value: year });
+  if (language) chips.push({ icon: Globe, label: "Language", value: language });
+  if (isHQ) chips.push({ icon: Zap, label: "Quality", value: "320 kbps" });
+  if (playCount) chips.push({ icon: Headphones, label: "Plays", value: playCount });
+  if (duration > 0) chips.push({ icon: Music2, label: "Duration", value: formatDuration(duration) });
+  if (label) chips.push({ icon: Award, label: "Label", value: label });
+
+  const fg = activeColors["--foreground"];
+  const muted = activeColors["--muted-foreground"];
+  const border = activeColors["--border"];
+
+  return (
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      {artworkUri && (
+        <Image source={{ uri: artworkUri }} blurRadius={28} style={StyleSheet.absoluteFill} />
+      )}
+      <View style={styles.overlay} />
+
+      <PlayerHeader fg={fg} onBack={() => router.back()} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+        showsVerticalScrollIndicator={false}
+        bounces
+      >
+        <PlayerArtwork artworkUri={artworkUri} isExplicit={isExplicit} />
+
+        <PlayerTrackInfo
+          title={title}
+          artist={primaryArtist}
+          composer={music}
+          fg={fg}
+          muted={muted}
+        />
+
+        <PlayerSeekBar
+          positionSV={positionSV}
+          durationSV={durationSV}
+          sliderWidth={sliderWidth}
+          isSeeking={isSeeking}
+          totalDuration={duration}
+          fg={fg}
+          muted={muted}
+          border={border}
+          onSeek={handleSeek}
+        />
+
+        <PlayerControls
+          isPlaying={isPlaying}
+          fg={fg}
+          border={border}
+          onPlayPause={handlePlayPause}
+        />
+
+        <PlayerInfoChips chips={chips} fg={fg} muted={muted} border={border} />
+
+        <PlayerArtistsSection artists={artists} fg={fg} muted={muted} border={border} />
+
+        <PlayerReleaseInfo releaseDate={releaseDate} copyright={copyright} muted={muted} border={border} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#000" },
+  overlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.52)" },
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 0 },
+});

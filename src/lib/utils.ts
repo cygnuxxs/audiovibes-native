@@ -70,3 +70,18 @@ export function generateRandomId(length = 8): string {
 export function decodeQuotes(text: string): string {
   return text.replace(/&quot;/g, '"');
 }
+
+
+export function formatDirectoryUri(uri: string): string {
+  if (!uri) return "";
+
+  try {
+    const decoded = decodeURIComponent(uri);
+    const treePart = decoded.split("/tree/")[1];
+    if (!treePart) return decoded;
+
+    return treePart.replace("primary:", "Internal Storage/").replace(/:/g, "/");
+  } catch {
+    return uri;
+  }
+}

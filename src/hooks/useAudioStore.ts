@@ -7,9 +7,22 @@ interface Track {
   title?: string;
   artist?: string;
   artwork?: string;
+  // Extended Song metadata
+  album?: string;
+  label?: string;
+  music?: string;
+  language?: string;
+  year?: string;
+  release_date?: string | null;
+  play_count?: string;
+  kbps_320?: string;
+  copyright_text?: string;
+  explicit_content?: string;
+  artists?: Artist[];
 }
 
 interface AudioState {
+  activeTrack: Track | null;
   play: (track: Track) => Promise<void>;
   pause: () => Promise<void>;
   toggle: (track: Track) => Promise<void>;
@@ -18,6 +31,7 @@ interface AudioState {
 
 export const useAudioStore = create<AudioState>((set, get) => {
   return {
+    activeTrack: null,
     play: async (track) => {
       const currentTrack = TrackPlayer.getActiveMediaItem();
 
@@ -31,6 +45,7 @@ export const useAudioStore = create<AudioState>((set, get) => {
         });
       }
 
+      set({ activeTrack: track });
       TrackPlayer.play();
     },
 
@@ -51,6 +66,7 @@ export const useAudioStore = create<AudioState>((set, get) => {
           artworkUrl: track.artwork,
         });
 
+        set({ activeTrack: track });
         TrackPlayer.play();
         return;
       }
@@ -63,7 +79,7 @@ export const useAudioStore = create<AudioState>((set, get) => {
         try {
           const playbackState = TrackPlayer.getPlaybackState() as any;
           state = playbackState?.state ?? playbackState;
-        } catch (e) {
+        } catch {
           // fallback if method fails
         }
         if (state === PlaybackState.Ended) {

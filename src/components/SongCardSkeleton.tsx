@@ -1,7 +1,7 @@
 import themes from "@/constants/themes";
 import { useThemeStore } from "@/store/themeStore";
 import { useShallow } from "zustand/react/shallow";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Easing, ScrollView, View } from "react-native";
 
 const SKELETON_COUNT = 4;
@@ -133,11 +133,11 @@ const SkeletonCard = ({
 const SongCardSkeleton = () => {
   const { theme, mode } = useThemeStore(useShallow((state) => ({ theme: state.theme, mode: state.mode })));
   const mutedColor = themes[theme][mode]["--muted-foreground"];
-  const shimmerAnim = useRef(new Animated.Value(0));
+  const [shimmerAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.timing(shimmerAnim.current, {
+      Animated.timing(shimmerAnim, {
         toValue: 1,
         duration: 1200,
         easing: Easing.inOut(Easing.ease),
@@ -151,7 +151,7 @@ const SongCardSkeleton = () => {
   return (
     <ScrollView className="px-1">
       {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-        <SkeletonCard key={i} shimmerAnim={shimmerAnim.current} mutedColor={mutedColor} />
+        <SkeletonCard key={i} shimmerAnim={shimmerAnim} mutedColor={mutedColor} />
       ))}
     </ScrollView>
   );

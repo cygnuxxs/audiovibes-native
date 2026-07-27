@@ -16,7 +16,7 @@ const setupPlayer = async () => {
       ],
     });
     isSetup = true;
-  } catch (error) {
+  } catch {
     isSetup = true;
   }
   return isSetup;

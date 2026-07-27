@@ -3,6 +3,7 @@ import themes from "@/constants/themes";
 import { useThemeStore } from "@/store/themeStore";
 import { Palette } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ const ThemeSelector = () => {
   const theme = useThemeStore((state) => state.theme);
   const mode = useThemeStore((state) => state.mode);
   const setTheme = useThemeStore((state) => state.setTheme);
+  const activeColor = useActiveColors();
   const themeNames = Object.keys(themes) as ThemeName[];
 
   const handleThemeChange = (value: string) => {
@@ -36,8 +38,8 @@ const ThemeSelector = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="outline" className="rounded-r-full">
-          <Palette color={themes[theme][mode]["--primary"]} size={18} />
+        <Button variant="secondary" className="size-16 rounded-2xl">
+          <Palette color={activeColor["--primary"]} size={24} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent insets={contentInsets} sideOffset={2}>

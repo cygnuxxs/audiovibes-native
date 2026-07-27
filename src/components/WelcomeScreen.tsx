@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Platform, Alert, ActivityIndicator } from "react-native";
+import { View, Platform, ActivityIndicator, Pressable } from "react-native";
+import { toast } from "sonner-native";
 import Animated, {
   FadeInUp,
   withRepeat,
@@ -11,16 +12,14 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from "react-native-reanimated";
-import { Headphones, Folder, Music, ArrowRight } from "lucide-react-native";
+import { Headphones, Folder, Music } from "lucide-react-native";
 import { StorageAccessFramework } from "expo-file-system/legacy";
 
-import themes from "@/constants/themes";
-import { Button } from "@/components/ui/button";
 import { Text } from "./ui/text";
 import { useAppStore } from "@/store/appStore";
 import { useDownloadStore } from "@/store/downloadStore";
-import { useThemeStore } from "@/store/themeStore";
-import { useShallow } from "zustand/react/shallow";
+import { useActiveColors } from "@/hooks/useActiveColors";
+import GetStartedButton from "./GetStartedButton";
 
 const FLOAT_1_EASING = Easing.inOut(Easing.ease);
 const FLOAT_2_EASING = Easing.inOut(Easing.ease);
@@ -28,18 +27,11 @@ const FLOAT_2_EASING = Easing.inOut(Easing.ease);
 export default function WelcomeScreen() {
   const setHasCompletedWelcome = useAppStore((state) => state.setHasCompletedWelcome);
   const setDownloadDirectoryUri = useDownloadStore((state) => state.setDownloadDirectoryUri);
-  const { theme, mode } = useThemeStore(useShallow((state) => ({ theme: state.theme, mode: state.mode })));
+  const activeColors = useActiveColors();
   const [isRequesting, setIsRequesting] = React.useState(false);
 
-  // Resolve theme colors
-  const primaryColor = React.useMemo(
-    () => themes[theme]?.[mode]?.["--primary"],
-    [theme, mode]
-  );
-  const primaryForegroundColor = React.useMemo(
-    () => themes[theme]?.[mode]?.["--primary-foreground"] ?? "#fff",
-    [theme, mode]
-  );
+  const primaryColor = activeColors["--primary"];
+  const primaryForegroundColor = activeColors["--primary-foreground"] ?? "#fff";
 
   const floatValue1 = useSharedValue(0);
   const floatValue2 = useSharedValue(0);
@@ -96,18 +88,16 @@ export default function WelcomeScreen() {
         setDownloadDirectoryUri(permissions.directoryUri);
         setHasCompletedWelcome(true);
       } else {
-        Alert.alert(
-          "Permission Needed",
-          "AudioVibes needs a folder to save your tracks for offline listening.",
-          [{ text: "Try Again", onPress: () => handleGetStarted() }]
-        );
+        toast("Permission Needed", {
+          description: "AudioVibes needs a folder to save your tracks for offline listening.",
+          action: { label: "Try Again", onClick: () => handleGetStarted() }
+        });
       }
     } catch (e) {
       console.warn("Failed to request directory permissions", e);
-      Alert.alert(
-        "Something Went Wrong",
-        "We couldn't set up your download folder. Please try again."
-      );
+      toast.error("Something Went Wrong", {
+        description: "We couldn't set up your download folder. Please try again."
+      });
     } finally {
       setIsRequesting(false);
     }
@@ -178,9 +168,10 @@ export default function WelcomeScreen() {
             </View>
           </Animated.View>
         )}
-        <Button
-          size={'lg'}
-          className="rounded-full py-6 flex-row items-center justify-center gap-2"
+        <Pressable
+          // size={'lg'}
+          // variant="outline"
+          className="rounded-full py-4 border border-border flex-row items-center justify-center gap-2"
           onPress={handleGetStarted}
           disabled={isRequesting}
           accessibilityRole="button"
@@ -190,17 +181,9 @@ export default function WelcomeScreen() {
           {isRequesting ? (
             <ActivityIndicator color={primaryForegroundColor} />
           ) : (
-            <>
-              <Text
-                className="font-semibold text-lg"
-                style={{ color: primaryForegroundColor }}
-              >
-                {Platform.OS === "android" ? "Choose Folder & Start" : "Get Started"}
-              </Text>
-              <ArrowRight color={primaryForegroundColor} size={20} strokeWidth={2} />
-            </>
+            <GetStartedButton primaryForegroundColor={primaryForegroundColor} />
           )}
-        </Button>
+        </Pressable>
       </View>
     </View>
   );

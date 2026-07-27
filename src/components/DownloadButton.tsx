@@ -1,6 +1,9 @@
 import { DownloadIcon, Loader2 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Alert, ToastAndroid, Platform } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { View } from "react-native";
+import { toast } from "sonner-native";
+import { useMetricsStore } from "@/store/metricsStore";
+import { generateRandomId } from "@/lib/utils";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -59,24 +62,26 @@ export default function DownloadButton({ song, color, primaryColor }: DownloadBu
     setIsDownloading(true);
     setDownloadProgress(0);
 
+    // Generate a unique ID for this download operation so the metrics
+    // store can correlate the download timing with the metadata write timing.
+    const metricId = generateRandomId(12);
+    useMetricsStore.getState().recordDownloadStart(metricId, song.title ?? "Unknown");
+
     try {
       const result = await downloadRawSongAndArtCover(
         song.image.replace("-50x50", "-500x500"),
         song.downloadUrl,
         (p) => {
           if (p >= 0 && p <= 1) setDownloadProgress(p);
-        }
+        },
+        metricId
       );
 
       if (result.success && result.songUri && result.imageUri) {
         setDownloadProgress(1);
-        await writeMetadataAndArtCover(result.songUri, result.imageUri, song);
+        await writeMetadataAndArtCover(result.songUri, result.imageUri, song, metricId);
         setIsDownloaded(true);
-        if (Platform.OS === 'android') {
-          ToastAndroid.show(`${song.title} is downloaded in the directory`, ToastAndroid.SHORT);
-        } else {
-          Alert.alert("Download Complete", `${song.title} is downloaded in the directory`);
-        }
+        toast.success(`${song.title} downloaded successfully`);
       }
     } catch (error) {
       console.error("Download failed:", error);

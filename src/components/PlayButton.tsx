@@ -73,6 +73,18 @@ export default function PlayButton({ song, songUrl, songId, color, primaryColor 
       title: song.title,
       artist: song.music,
       artwork: song.image.replace('-50x50', '-500x500'),
+      // Extended metadata
+      album: song.album,
+      label: song.label,
+      music: song.music,
+      language: song.language,
+      year: song.year,
+      release_date: song.release_date,
+      play_count: song.play_count,
+      kbps_320: song.kbps_320,
+      copyright_text: song.copyright_text,
+      explicit_content: song.explicit_content,
+      artists: song.artists,
     });
   }, [toggle, songId, songUrl, song]);
 

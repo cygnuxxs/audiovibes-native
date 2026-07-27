@@ -6,7 +6,7 @@ import { ScrollView } from "react-native";
 import EmptySongsState from "./EmptyState";
 import SongCard from "./SongCard";
 
-const DisplaySongs = ({ songs }: { songs: Song[] }) => {
+const DisplaySongs = ({ songs, bottomPadding = 0 }: { songs: Song[]; bottomPadding?: number }) => {
   const { theme, mode } = useThemeStore(useShallow((state) => ({ theme: state.theme, mode: state.mode })));
   const mutedColor = themes[theme][mode]["--muted-foreground"];
   const foregroundColor = themes[theme][mode]["--accent-foreground"];
@@ -15,7 +15,7 @@ const DisplaySongs = ({ songs }: { songs: Song[] }) => {
   return songs.length === 0 ? (
     <EmptySongsState />
   ) : (
-    <ScrollView className="flex-1 mb-14">
+    <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bottomPadding }}>
       {songs.map((item) => (
         <SongCard
           key={item.id}

@@ -5,6 +5,7 @@ import { StorageAccessFramework } from "expo-file-system/legacy";
 import * as FileSystem from "expo-file-system/legacy";
 import { ffmpeg } from '@cygnuxxs/writer';
 import { Platform } from "react-native";
+import { useMetricsStore } from "@/store/metricsStore";
 
 // --- HELPER FUNCTIONS ---
 
@@ -50,7 +51,8 @@ function decodeHTMLEntities(text: string): string {
 export async function downloadRawSongAndArtCover(
     imageUrl: string,
     songUrl: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    metricId?: string
 ): Promise<{
     success: boolean;
     songUri: string | null;
@@ -60,6 +62,8 @@ export async function downloadRawSongAndArtCover(
     const randomId = generateRandomId(8);
     const songFile = new File(directory, `${randomId}.m4a`);
     const imageFile = new File(directory, `${randomId}.jpg`);
+
+    const t0 = Date.now();
 
     try {
         const downloadResumable = FileSystem.createDownloadResumable(
@@ -80,6 +84,12 @@ export async function downloadRawSongAndArtCover(
 
         if (!songOutput?.uri || !imageOutput.exists) {
             throw new Error("One or more files failed to download");
+        }
+
+        const durationMs = Date.now() - t0;
+        const fileSizeBytes = songFile.exists ? songFile.size ?? null : null;
+        if (metricId) {
+            useMetricsStore.getState().recordDownloadComplete(metricId, durationMs, fileSizeBytes);
         }
 
         return {
@@ -103,14 +113,15 @@ export async function downloadRawSongAndArtCover(
 export async function writeMetadataAndArtCover(
     songUri: string,
     imageUri: string,
-    song: Song // Replace 'any' with your actual Song type/interface
+    song: Song, // Replace 'any' with your actual Song type/interface
+    metricId?: string
 ): Promise<string | null> {
     // Using cache directory for the temporary ffmpeg output
     const directory = ensureDirectory(Paths.cache, "audiovibes");
 
     // Decode HTML entities (e.g. &quot;) and remove only illegal file path characters
     const decodedTitle = decodeHTMLEntities(song.title || "");
-    const safeTitle = decodedTitle.replace(/[/\\?%*:|"<>]/g, '-').trim();
+    const safeTitle = decodedTitle.replace(/[\/\\?%*:|"><]/g, '-').trim();
     const outputFile = new File(directory, `${safeTitle}.m4a`);
 
     // Clean up description building using a filtered array
@@ -121,6 +132,8 @@ export async function writeMetadataAndArtCover(
         getArtistNamesByRole(song.artists, 'starring') && `Starring: ${getArtistNamesByRole(song.artists, 'starring')}`,
         getArtistNamesByRole(song.artists, 'lyricist') && `Lyricist: ${getArtistNamesByRole(song.artists, 'lyricist')}`
     ].filter(Boolean).join(' | ');
+
+    const t0 = Date.now();
 
     try {
 
@@ -143,6 +156,11 @@ export async function writeMetadataAndArtCover(
             },
             imageUri ? getLocalPath(imageUri) : undefined
         );
+
+        const metaDurationMs = Date.now() - t0;
+        if (metricId) {
+            useMetricsStore.getState().recordMetadataWrite(metricId, metaDurationMs);
+        }
 
         let finalUri = outputFile.uri;
         const { downloadDirectoryUri } = useDownloadStore.getState();

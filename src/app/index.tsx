@@ -4,6 +4,8 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import { useAppStore } from "@/store/appStore";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import SpotlightSearch from "@/components/SpotlightSearch";
+
 const HomeScreen = () => {
   const hasCompletedWelcome = useAppStore((state) => state.hasCompletedWelcome);
 
@@ -15,6 +17,7 @@ const HomeScreen = () => {
     <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom", "left", "right"]}>
       <Header />
       <SearchSongs />
+      <SpotlightSearch />
     </SafeAreaView>
   );
 };

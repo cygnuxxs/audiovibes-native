@@ -1,4 +1,4 @@
-interface Theme {
+export interface Theme {
   light: Record<string, string>;
   dark: Record<string, string>;
 }

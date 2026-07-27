@@ -1,18 +1,16 @@
-import themes from "@/constants/themes";
-import { useThemeStore } from "@/store/themeStore";
-import { useShallow } from "zustand/react/shallow";
 import { SearchX } from "lucide-react-native";
+import { useActiveColors } from "@/hooks/useActiveColors";
 import { View } from "react-native";
 import { Text } from "./ui/text";
 
 export default function EmptySongsState() {
-  const { theme, mode } = useThemeStore(useShallow((state) => ({ theme: state.theme, mode: state.mode })));
+  const activeColors = useActiveColors();
   return (
     <View className="flex-1 items-center justify-center bg-background px-8">
       <View className="bg-secondary p-6 rounded-full mb-8 border border-muted">
         <SearchX
           size={48}
-          color={themes[theme][mode]["--muted-foreground"]}
+          color={activeColors["--muted-foreground"]}
           strokeWidth={1.5}
         />
       </View>
