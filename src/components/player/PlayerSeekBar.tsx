@@ -11,6 +11,7 @@ import Animated, {
   SharedValue,
 } from "react-native-reanimated";
 import { clampRatio, formatDisplayTime } from "@/lib/playerUtils";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 const THUMB_SIZE = 14;
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -21,9 +22,6 @@ interface PlayerSeekBarProps {
   sliderWidth: SharedValue<number>;
   isSeeking: SharedValue<boolean>;
   totalDuration: number;
-  fg: string;
-  muted: string;
-  border: string;
   onSeek: (position: number) => void;
 }
 
@@ -33,11 +31,14 @@ export function PlayerSeekBar({
   sliderWidth,
   isSeeking,
   totalDuration,
-  fg,
-  muted,
-  border,
   onSeek,
 }: PlayerSeekBarProps) {
+  const activeColors = useActiveColors();
+  const fg = activeColors["--foreground"];
+  const primary = activeColors["--primary"];
+  const border = activeColors["--border"];
+  const mutedFg = activeColors["--muted-foreground"];
+
   const panGesture = Gesture.Pan()
     .onBegin((e) => {
       "worklet";
@@ -75,8 +76,8 @@ export function PlayerSeekBar({
     const ratio = durationSV.value > 0 ? clampRatio(positionSV.value / durationSV.value) : 0;
     return {
       left: ratio * sliderWidth.value - THUMB_SIZE / 2,
-      opacity: withTiming(isSeeking.value ? 1 : 0, { duration: 150 }),
-      transform: [{ scale: withSpring(isSeeking.value ? 1.2 : 0.6) }],
+      opacity: withTiming(isSeeking.value ? 1 : 0.6, { duration: 150 }),
+      transform: [{ scale: withSpring(isSeeking.value ? 1.3 : 0.8) }],
     };
   });
 
@@ -86,12 +87,15 @@ export function PlayerSeekBar({
   });
 
   return (
-    <View style={styles.seekSection}>
+    <View className="mt-4 px-8">
       <GestureDetector gesture={panGesture}>
         <View onLayout={onSliderLayout} style={styles.sliderHitArea} collapsable={false}>
+          {/* Track background */}
           <View style={[styles.sliderTrack, { backgroundColor: border }]}>
-            <Animated.View style={[styles.sliderFill, { backgroundColor: fg }, fillStyle]} />
+            {/* Filled portion uses --primary for theme accent */}
+            <Animated.View style={[styles.sliderFill, { backgroundColor: primary }, fillStyle]} />
           </View>
+          {/* Thumb — uses foreground color */}
           <Animated.View
             style={[
               styles.thumb,
@@ -108,13 +112,16 @@ export function PlayerSeekBar({
         </View>
       </GestureDetector>
 
-      <View style={styles.timeRow}>
+      <View className="flex-row justify-between mt-2">
         <AnimatedTextInput
           editable={false}
           animatedProps={animatedTimeProps}
-          style={[styles.timeLabel, { color: muted }]}
+          style={[styles.timeLabel, { color: mutedFg }]}
         />
-        <Text style={[styles.timeLabel, { color: muted }]}>
+        <Text
+          className="text-[11px]"
+          style={[styles.timeLabelBase, { color: mutedFg, opacity: 0.9 }]}
+        >
           {formatDisplayTime(totalDuration)}
         </Text>
       </View>
@@ -123,26 +130,24 @@ export function PlayerSeekBar({
 }
 
 const styles = StyleSheet.create({
-  seekSection: { marginTop: 20, paddingHorizontal: 32 },
   sliderHitArea: { paddingVertical: 12, marginVertical: -12 },
-  sliderTrack: { height: 2, width: "100%", borderRadius: 1, overflow: "hidden" },
-  sliderFill: { height: "100%", borderRadius: 1 },
+  sliderTrack: { height: 3, width: "100%", borderRadius: 2, overflow: "hidden" },
+  sliderFill: { height: "100%", borderRadius: 2 },
   thumb: {
     position: "absolute",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  timeRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
   timeLabel: {
     fontSize: 11,
     fontVariant: ["tabular-nums"],
     opacity: 0.9,
     padding: 0,
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  },
+  timeLabelBase: {
+    fontVariant: ["tabular-nums"],
   },
 });

@@ -1,54 +1,56 @@
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { Text } from "@/components/ui/text";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 interface PlayerTrackInfoProps {
   title: string;
   artist: string;
   composer?: string;
-  fg: string;
-  muted: string;
 }
 
-export function PlayerTrackInfo({ title, artist, composer, fg, muted }: PlayerTrackInfoProps) {
+export function PlayerTrackInfo({ title, artist, composer }: PlayerTrackInfoProps) {
+  const colors = useActiveColors();
+  const showComposer = composer && composer !== artist;
+
   return (
-    <View style={styles.metadata}>
-      <Text style={[styles.trackTitle, { color: fg }]} numberOfLines={2}>
+    <View className="mx-8 mt-5 mb-2 items-center gap-1">
+      <Text
+        className="text-2xl font-bold tracking-tight leading-tight text-center"
+        style={{ color: colors["--foreground"] }}
+        numberOfLines={2}
+      >
         {title}
       </Text>
-      <Text style={[styles.trackArtist, { color: muted }]} numberOfLines={1}>
+
+      <Text
+        className="text-base font-medium text-center"
+        style={{ color: colors["--muted-foreground"] }}
+        numberOfLines={1}
+      >
         {artist}
       </Text>
-      {composer && composer !== artist && (
-        <Text style={[styles.trackComposer, { color: muted }]} numberOfLines={1}>
-          Composed by {composer}
-        </Text>
+
+      {showComposer && (
+        <View className="flex-row items-center gap-1.5 mt-1">
+          <Text
+            className="text-xs font-normal"
+            style={{ color: colors["--muted-foreground"], opacity: 0.6 }}
+          >
+            Composer
+          </Text>
+          <View
+            className="w-1 h-1 rounded-full"
+            style={{ backgroundColor: colors["--muted-foreground"], opacity: 0.4 }}
+          />
+          <Text
+            className="text-xs font-normal flex-1 text-center"
+            style={{ color: colors["--muted-foreground"], opacity: 0.75 }}
+            numberOfLines={1}
+          >
+            {composer}
+          </Text>
+        </View>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  metadata: { paddingHorizontal: 32, paddingTop: 24, gap: 4 },
-  trackTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-    textShadowColor: "rgba(0,0,0,0.85)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
-  trackArtist: {
-    fontSize: 14,
-    fontWeight: "500",
-    opacity: 0.9,
-    textShadowColor: "rgba(0,0,0,0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  trackComposer: {
-    fontSize: 12,
-    fontWeight: "400",
-    opacity: 0.7,
-    marginTop: 2,
-  },
-});

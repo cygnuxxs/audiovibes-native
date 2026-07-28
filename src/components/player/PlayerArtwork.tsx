@@ -1,5 +1,6 @@
-import { View, Image, StyleSheet, Dimensions } from "react-native";
+import { View, Image, Dimensions } from "react-native";
 import { Text } from "@/components/ui/text";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 const { width } = Dimensions.get("window");
 const ARTWORK_SIZE = width - 64;
@@ -10,45 +11,42 @@ interface PlayerArtworkProps {
 }
 
 export function PlayerArtwork({ artworkUri, isExplicit }: PlayerArtworkProps) {
+  const colors = useActiveColors();
+
   return (
-    <View style={styles.artworkWrapper}>
-      <View style={[styles.artworkContainer, { width: ARTWORK_SIZE, height: ARTWORK_SIZE }]}>
+    <View className="items-center px-8 pt-3 pb-4">
+      <View
+        className="rounded-2xl overflow-hidden"
+        style={{
+          width: ARTWORK_SIZE,
+          height: ARTWORK_SIZE,
+          shadowColor: colors["--foreground"],
+          shadowOffset: { width: 0, height: 12 },
+          shadowOpacity: 0.55,
+          shadowRadius: 28,
+          elevation: 20,
+        }}
+      >
         {artworkUri ? (
-          <Image source={{ uri: artworkUri }} style={styles.artworkImage} />
+          <Image source={{ uri: artworkUri }} className="w-full h-full" resizeMode="cover" />
         ) : (
-          <View style={[styles.artworkImage, styles.artworkPlaceholder]} />
+          <View className="w-full h-full bg-muted" />
         )}
       </View>
+
       {isExplicit && (
-        <View style={styles.explicitBadge}>
-          <Text style={styles.explicitText}>E</Text>
+        <View
+          className="absolute bottom-6 right-10 rounded px-1.5 py-0.5"
+          style={{ backgroundColor: `${colors["--primary-foreground"]}26` }}
+        >
+          <Text
+            className="text-[10px] font-bold tracking-wide"
+            style={{ color: colors["--primary-foreground"] }}
+          >
+            E
+          </Text>
         </View>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  artworkWrapper: { alignItems: "center", paddingHorizontal: 32, paddingTop: 12 },
-  artworkContainer: {
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
-    elevation: 16,
-  },
-  artworkImage: { width: "100%", height: "100%" },
-  artworkPlaceholder: { backgroundColor: "#1a1a1a" },
-  explicitBadge: {
-    position: "absolute",
-    bottom: 10,
-    right: 42,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  explicitText: { fontSize: 10, fontWeight: "700", color: "#fff", letterSpacing: 0.5 },
-});

@@ -1,69 +1,127 @@
-import { View, Image, StyleSheet } from "react-native";
+import { useState, useCallback } from "react";
+import { View, Image, Pressable } from "react-native";
 import { Text } from "@/components/ui/text";
 import { Users } from "lucide-react-native";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 interface PlayerArtistsSectionProps {
   artists: Artist[];
-  fg: string;
-  muted: string;
-  border: string;
+  onArtistPress?: (artist: Artist) => void;
 }
 
-export function PlayerArtistsSection({ artists, fg, muted, border }: PlayerArtistsSectionProps) {
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+function ArtistAvatar({ artist, colors }: { artist: Artist; colors: Record<string, string> }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!artist.image || failed) {
+    return (
+      <View
+        className="w-10 h-10 rounded-full items-center justify-center"
+        style={{ backgroundColor: colors["--primary"] }}
+      >
+        <Text
+          className="text-sm font-bold"
+          style={{ color: colors["--primary-foreground"] }}
+        >
+          {getInitials(artist.name) || "?"}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: artist.image.replace("-50x50", "-150x150") }}
+      className="w-10 h-10 rounded-full"
+      style={{ backgroundColor: colors["--border"] }}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
+
+export function PlayerArtistsSection({ artists, onArtistPress }: PlayerArtistsSectionProps) {
+  const colors = useActiveColors();
+  const sectionLabelColor = colors["--muted-foreground"];
+  const nameColor = colors["--foreground"];
+  const roleColor = colors["--muted-foreground"];
+  const dividerColor = colors["--border"];
+  const iconColor = colors["--primary"];
+
   if (artists.length === 0) return null;
 
   return (
-    <View style={styles.section}>
-      <View style={[styles.sectionDivider, { backgroundColor: border }]} />
-      <View style={styles.sectionHeader}>
-        <Users size={14} color={muted} strokeWidth={1.75} />
-        <Text style={[styles.sectionTitle, { color: muted }]}>Artists</Text>
+    <View className="px-8 pt-5">
+      {/* Divider */}
+      <View
+        className="h-px mb-4"
+        style={{ backgroundColor: dividerColor, opacity: 0.5 }}
+      />
+
+      <View className="flex-row items-center gap-1.5 mb-3.5">
+        <Users size={13} color={iconColor} strokeWidth={2} />
+        <Text
+          className="text-[11px] font-bold tracking-widest uppercase"
+          style={{ color: sectionLabelColor }}
+        >
+          {artists.length > 1 ? "Artists" : "Artist"}
+        </Text>
       </View>
-      <View style={styles.artistsList}>
-        {artists.map((artist, i) => (
-          <View key={`${artist.id}-${artist.role ?? i}`} style={styles.artistRow}>
-            {artist.image ? (
-              <Image
-                source={{ uri: artist.image.replace("-50x50", "-150x150") }}
-                style={styles.artistAvatar}
-              />
-            ) : (
-              <View
-                style={[styles.artistAvatar, styles.artistAvatarPlaceholder, { backgroundColor: border }]}
-              />
-            )}
-            <View style={styles.artistInfo}>
-              <Text style={[styles.artistName, { color: fg }]} numberOfLines={1}>
-                {artist.name}
-              </Text>
-              {artist.role ? (
-                <Text style={[styles.artistRole, { color: muted }]} numberOfLines={1}>
-                  {artist.role}
+
+      <View className="gap-3">
+        {artists.map((artist, i) => {
+          const key = `${artist.id}-${artist.role ?? i}`;
+          const content = (
+            <View className="flex-row items-center gap-3">
+              <ArtistAvatar artist={artist} colors={colors} />
+              <View className="flex-1 gap-0.5">
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: nameColor }}
+                  numberOfLines={1}
+                >
+                  {artist.name}
                 </Text>
-              ) : null}
+                {artist.role ? (
+                  <Text
+                    className="text-[11px] capitalize"
+                    style={{ color: roleColor, opacity: 0.7 }}
+                    numberOfLines={1}
+                  >
+                    {artist.role}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+
+          if (!onArtistPress) {
+            return <View key={key}>{content}</View>;
+          }
+
+          return (
+            <Pressable
+              key={key}
+              onPress={() => onArtistPress(artist)}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${artist.name}${artist.role ? `, ${artist.role}` : ""}`}
+              hitSlop={4}
+              className="active:opacity-60"
+            >
+              {content}
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { paddingHorizontal: 32, paddingTop: 20 },
-  sectionDivider: { height: StyleSheet.hairlineWidth, marginBottom: 18, opacity: 0.4 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.1,
-    textTransform: "uppercase",
-  },
-  artistsList: { gap: 12 },
-  artistRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  artistAvatar: { width: 40, height: 40, borderRadius: 20 },
-  artistAvatarPlaceholder: {},
-  artistInfo: { flex: 1, gap: 2 },
-  artistName: { fontSize: 14, fontWeight: "600" },
-  artistRole: { fontSize: 11, opacity: 0.7, textTransform: "capitalize" },
-});

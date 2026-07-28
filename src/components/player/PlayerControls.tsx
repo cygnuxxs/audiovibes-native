@@ -1,43 +1,41 @@
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable } from "react-native";
 import { Play, Pause } from "lucide-react-native";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 interface PlayerControlsProps {
   isPlaying: boolean;
-  fg: string;
-  border: string;
   onPlayPause: () => void;
 }
 
-export function PlayerControls({ isPlaying, fg, border, onPlayPause }: PlayerControlsProps) {
+export function PlayerControls({ isPlaying, onPlayPause }: PlayerControlsProps) {
+  const colors = useActiveColors();
+  const primary = colors["--primary"];
+  const primaryFg = colors["--primary-foreground"];
+  const mutedFg = colors["--muted-foreground"];
+
   return (
-    <View style={styles.controls}>
-      <Pressable onPress={onPlayPause} style={[styles.playBtn, { borderColor: border }]}>
+    <View className="flex-row items-center justify-center gap-10 px-8 mt-6 mb-2">
+      {/* Play / Pause — primary themed */}
+      <Pressable
+        onPress={onPlayPause}
+        className="w-16 h-16 rounded-full items-center justify-center active:opacity-80"
+        style={{
+          backgroundColor: primary,
+          shadowColor: primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.45,
+          shadowRadius: 12,
+          elevation: 8,
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={isPlaying ? "Pause" : "Play"}
+      >
         {isPlaying ? (
-          <Pause size={24} color={fg} fill={fg} />
+          <Pause size={24} color={primaryFg} fill={primaryFg} />
         ) : (
-          <Play size={24} color={fg} fill={fg} style={{ marginLeft: 2 }} />
+          <Play size={24} color={primaryFg} fill={primaryFg} style={{ marginLeft: 2 }} />
         )}
       </Pressable>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  controls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 40,
-    paddingHorizontal: 32,
-    marginTop: 32,
-  },
-  playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-});

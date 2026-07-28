@@ -1,13 +1,12 @@
 import { useCallback, useEffect } from "react";
-import { View, Image, Dimensions, StyleSheet } from "react-native";
+import { View, Image, StyleSheet, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import TrackPlayer, { useActiveMediaItem, useIsPlaying, useProgress } from "@rntp/player";
 import { Disc3, Globe, Zap, Award, Calendar, Headphones, Music2 } from "lucide-react-native";
 import { useAudioStore } from "@/hooks/useAudioStore";
-import { useActiveColors } from "@/hooks/useActiveColors";
 import { useSharedValue } from "react-native-reanimated";
-import { ScrollView } from "react-native";
+import { useActiveColors } from "@/hooks/useActiveColors";
 
 import { PlayerHeader } from "@/components/player/PlayerHeader";
 import { PlayerArtwork } from "@/components/player/PlayerArtwork";
@@ -20,6 +19,7 @@ import { PlayerReleaseInfo } from "@/components/player/PlayerReleaseInfo";
 import { formatPlayCount, formatDuration } from "@/lib/playerUtils";
 
 export default function PlayerScreen() {
+  const colors = useActiveColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -27,7 +27,6 @@ export default function PlayerScreen() {
   const isPlaying = useIsPlaying();
   const progress = useProgress(250);
   const audioStore = useAudioStore();
-  const activeColors = useActiveColors();
 
   // Shared values passed down to PlayerSeekBar
   const positionSV = useSharedValue(0);
@@ -88,33 +87,35 @@ export default function PlayerScreen() {
   if (duration > 0) chips.push({ icon: Music2, label: "Duration", value: formatDuration(duration) });
   if (label) chips.push({ icon: Award, label: "Label", value: label });
 
-  const fg = activeColors["--foreground"];
-  const muted = activeColors["--muted-foreground"];
-  const border = activeColors["--border"];
-
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {artworkUri && (
-        <Image source={{ uri: artworkUri }} blurRadius={28} style={StyleSheet.absoluteFill} />
-      )}
-      <View style={styles.overlay} />
-
-      <PlayerHeader fg={fg} onBack={() => router.back()} />
-
+    <View className="flex-1 bg-background">
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
         bounces
       >
-        <PlayerArtwork artworkUri={artworkUri} isExplicit={isExplicit} />
+        {/* ── Top section: header + artwork with scrolling blurred background ── */}
+        <View style={{ paddingTop: insets.top, overflow: "hidden" }} className="relative">
+          {artworkUri && (
+            <Image source={{ uri: artworkUri }} blurRadius={30} style={StyleSheet.absoluteFill} />
+          )}
+          {/* Themed scrim */}
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: colors["--background"], opacity: 0.6 },
+            ]}
+          />
+
+          <PlayerHeader onBack={() => router.back()} />
+          <PlayerArtwork artworkUri={artworkUri} isExplicit={isExplicit} />
+        </View>
 
         <PlayerTrackInfo
           title={title}
           artist={primaryArtist}
           composer={music}
-          fg={fg}
-          muted={muted}
         />
 
         <PlayerSeekBar
@@ -123,32 +124,20 @@ export default function PlayerScreen() {
           sliderWidth={sliderWidth}
           isSeeking={isSeeking}
           totalDuration={duration}
-          fg={fg}
-          muted={muted}
-          border={border}
           onSeek={handleSeek}
         />
 
         <PlayerControls
           isPlaying={isPlaying}
-          fg={fg}
-          border={border}
           onPlayPause={handlePlayPause}
         />
 
-        <PlayerInfoChips chips={chips} fg={fg} muted={muted} border={border} />
+        <PlayerInfoChips chips={chips} />
 
-        <PlayerArtistsSection artists={artists} fg={fg} muted={muted} border={border} />
+        <PlayerArtistsSection artists={artists} />
 
-        <PlayerReleaseInfo releaseDate={releaseDate} copyright={copyright} muted={muted} border={border} />
+        <PlayerReleaseInfo releaseDate={releaseDate} copyright={copyright} />
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
-  overlay: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.52)" },
-  scroll: { flex: 1 },
-  scrollContent: { paddingTop: 0 },
-});
