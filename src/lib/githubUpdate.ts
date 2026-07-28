@@ -27,6 +27,106 @@ export interface UpdateInfo {
     apkAsset?: GithubAsset;
     currentVersion: string;
     latestVersion: string;
+    deviceArch?: DeviceArchInfo;
+}
+
+export interface DeviceArchInfo {
+    primaryAbi: string;
+    is64Bit: boolean;
+    bitLabel: "64bit" | "32bit";
+}
+
+/**
+ * Detects mobile device CPU architecture and bitness (32bit vs 64bit).
+ */
+export function getDeviceArchitecture(): DeviceArchInfo {
+    const platformConstants = (Platform.constants || {}) as {
+        SUPPORTED_ABIS?: string[];
+        SUPPORTED_64_BIT_ABIS?: string[];
+        SUPPORTED_32_BIT_ABIS?: string[];
+    };
+
+    const supportedAbis = platformConstants.SUPPORTED_ABIS || [];
+    const supported64 = platformConstants.SUPPORTED_64_BIT_ABIS || [];
+
+    let primaryAbi = supportedAbis[0] || "";
+
+    if (!primaryAbi && Constants.systemArchitectures) {
+        if (Array.isArray(Constants.systemArchitectures)) {
+            primaryAbi = Constants.systemArchitectures[0] || "";
+        } else if (typeof Constants.systemArchitectures === "string") {
+            primaryAbi = Constants.systemArchitectures;
+        }
+    }
+
+    const abiLower = primaryAbi.toLowerCase();
+
+    const is64Bit =
+        supported64.length > 0 ||
+        abiLower.includes("64") ||
+        abiLower.includes("arm64") ||
+        abiLower.includes("aarch64") ||
+        abiLower.includes("x86_64");
+
+    return {
+        primaryAbi: primaryAbi || (is64Bit ? "arm64-v8a" : "armeabi-v7a"),
+        is64Bit,
+        bitLabel: is64Bit ? "64bit" : "32bit",
+    };
+}
+
+/**
+ * Selects the best matching APK asset for the current device architecture.
+ */
+export function selectMatchingApkAsset(assets: GithubAsset[]): GithubAsset | undefined {
+    const apkAssets = assets.filter(
+        (a) =>
+            a.name.endsWith(".apk") ||
+            a.content_type === "application/vnd.android.package-archive"
+    );
+
+    if (apkAssets.length === 0) return undefined;
+    if (apkAssets.length === 1) return apkAssets[0];
+
+    const deviceArch = getDeviceArchitecture();
+    const abi = deviceArch.primaryAbi.toLowerCase();
+    const is64 = deviceArch.is64Bit;
+
+    // 1. Try exact/specific ABI match in filename (e.g. "arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    const exactAbiMatch = apkAssets.find((a) => a.name.toLowerCase().includes(abi));
+    if (exactAbiMatch) return exactAbiMatch;
+
+    // 2. Try bitness label match (e.g. "64bit", "64-bit", "arm64" vs "32bit", "32-bit", "v7a", "arm")
+    const bitMatch = apkAssets.find((a) => {
+        const name = a.name.toLowerCase();
+        if (is64) {
+            return (
+                name.includes("64bit") ||
+                name.includes("64-bit") ||
+                name.includes("arm64") ||
+                name.includes("v8a") ||
+                name.includes("x86_64")
+            );
+        } else {
+            return (
+                name.includes("32bit") ||
+                name.includes("32-bit") ||
+                name.includes("v7a") ||
+                name.includes("armeabi") ||
+                (name.includes("arm") && !name.includes("arm64"))
+            );
+        }
+    });
+    if (bitMatch) return bitMatch;
+
+    // 3. Fall back to universal APK
+    const universalMatch = apkAssets.find((a) =>
+        a.name.toLowerCase().includes("universal")
+    );
+    if (universalMatch) return universalMatch;
+
+    // 4. Default to first APK
+    return apkAssets[0];
 }
 
 /**
@@ -68,15 +168,12 @@ export async function checkForGithubUpdate(): Promise<UpdateInfo> {
     const latestVersion = release.tag_name.replace(/^v/, "");
 
     const available = isNewerVersion(currentVersion, latestVersion);
+    const deviceArch = getDeviceArchitecture();
 
-    // Find an APK asset (Android only)
-    const apkAsset = release.assets.find(
-        (a) =>
-            a.name.endsWith(".apk") ||
-            a.content_type === "application/vnd.android.package-archive"
-    );
+    // Find matching APK asset for mobile architecture
+    const apkAsset = selectMatchingApkAsset(release.assets);
 
-    return { available, release, apkAsset, currentVersion, latestVersion };
+    return { available, release, apkAsset, currentVersion, latestVersion, deviceArch };
 }
 
 export interface DownloadApkResult {
