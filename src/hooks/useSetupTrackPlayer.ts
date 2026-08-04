@@ -4,12 +4,12 @@ import TrackPlayer, { PlayerCommand } from '@rntp/player';
 const setupPlayer = async () => {
   let isSetup = false;
   try {
-    TrackPlayer.setupPlayer({
+    await TrackPlayer.setupPlayer({
       android: {
         taskRemovedBehavior: 'stop',
       },
     });
-    TrackPlayer.setCommands({
+    await TrackPlayer.setCommands({
       capabilities: [
         PlayerCommand.PlayPause,
         PlayerCommand.Stop,

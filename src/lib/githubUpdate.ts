@@ -1,6 +1,7 @@
-import * as FileSystem from "expo-file-system/legacy";
-import { Linking, Platform } from "react-native";
+import { File, Paths } from "expo-file-system";
+import { Platform, AppState } from "react-native";
 import Constants from "expo-constants";
+import { apkInstaller } from "@cygnuxxs/apkinstaller";
 
 const GITHUB_REPO = "cygnuxxs/audiovibes-native";
 const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
@@ -153,9 +154,9 @@ export function isNewerVersion(current: string, latest: string): boolean {
 /**
  * Fetches the latest GitHub release and compares it against the installed version.
  */
-export async function checkForGithubUpdate(): Promise<UpdateInfo> {
-    const currentVersion = Constants.expoConfig?.version ?? "1.0.0";
-
+export async function checkForGithubUpdate(
+    currentVersion = "1.0.1"
+): Promise<UpdateInfo> {
     const response = await fetch(RELEASES_API, {
         headers: { Accept: "application/vnd.github+json" },
     });
@@ -178,60 +179,165 @@ export async function checkForGithubUpdate(): Promise<UpdateInfo> {
 
 export interface DownloadApkResult {
     localUri: string;
+    isCached: boolean;
+}
+
+/**
+ * Checks whether an APK with the given filename is already cached.
+ */
+export function isApkCached(fileName: string, expectedBytes?: number): boolean {
+    try {
+        const destination = new File(Paths.cache, fileName);
+        if (!destination.exists) return false;
+        if (expectedBytes && expectedBytes > 0 && destination.size && destination.size !== expectedBytes) {
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Clears cached APK file if it exists.
+ */
+export function clearCachedApk(fileName: string): void {
+    try {
+        const file = new File(Paths.cache, fileName);
+        if (file.exists) {
+            file.delete();
+        }
+    } catch {
+        // Ignore deletion errors
+    }
 }
 
 /**
  * Downloads the APK from the given URL into the app cache directory,
  * reporting progress via onProgress (0–1).
- * Returns the local file URI.
+ * If the file is already downloaded in cache, reuses it.
+ * Returns the local file URI and whether it was loaded from cache.
  */
 export async function downloadApk(
     downloadUrl: string,
     fileName: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    expectedBytes?: number
 ): Promise<DownloadApkResult> {
-    if (!FileSystem.cacheDirectory) {
-        throw new Error("No cache directory available");
+    const destination = new File(Paths.cache, fileName);
+
+    if (destination.exists) {
+        const matchesSize =
+            !expectedBytes ||
+            expectedBytes <= 0 ||
+            !destination.size ||
+            destination.size === expectedBytes;
+
+        if (matchesSize) {
+            onProgress?.(1);
+            return { localUri: destination.uri, isCached: true };
+        }
+
+        try {
+            destination.delete();
+        } catch {
+            // Ignore stale cache cleanup failures
+        }
     }
 
-    const localUri = `${FileSystem.cacheDirectory}${fileName}`;
+    const downloadTask = File.createDownloadTask(downloadUrl, destination, {
+        onProgress: ({ bytesWritten, totalBytes }: { bytesWritten: number; totalBytes: number }) => {
+            const totalExpectedBytes = totalBytes > 0 ? totalBytes : expectedBytes ?? 0;
 
-    const downloadResumable = FileSystem.createDownloadResumable(
-        downloadUrl,
-        localUri,
-        {},
-        (progress) => {
             const pct =
-                progress.totalBytesExpectedToWrite > 0
-                    ? progress.totalBytesWritten / progress.totalBytesExpectedToWrite
+                totalExpectedBytes > 0
+                    ? Math.min(1, Math.max(0, bytesWritten / totalExpectedBytes))
                     : 0;
+
             onProgress?.(pct);
-        }
-    );
+        },
+    });
 
-    const result = await downloadResumable.downloadAsync();
+    const result = await downloadTask.downloadAsync();
 
-    if (!result?.uri) {
+    if (!result) {
         throw new Error("Download failed — no URI returned");
     }
 
-    return { localUri: result.uri };
+    return { localUri: result.uri, isCached: false };
+}
+
+export interface InstallApkOptions {
+    onAutoInstallSuccess?: () => void;
+    onAutoInstallError?: (error: any) => void;
+}
+
+let pendingInstallUri: string | null = null;
+let appStateSubscription: { remove: () => void } | null = null;
+
+export function clearPendingInstall(): void {
+    pendingInstallUri = null;
+    if (appStateSubscription) {
+        appStateSubscription.remove();
+        appStateSubscription = null;
+    }
 }
 
 /**
  * Opens the downloaded APK so Android can prompt the user to install it.
  * Requires the INSTALL_PACKAGES permission or side-loading to be enabled.
+ * If permission is missing, opens Install Settings and automatically redirects
+ * back to installation when user returns to the app.
+ * Returns true if installer opened directly, false if permissions needed or suppressed.
  */
-export async function installApk(localUri: string): Promise<void> {
-    if (Platform.OS !== "android") return;
+export async function installApk(
+    localUri: string,
+    options?: InstallApkOptions
+): Promise<boolean> {
+    if (Platform.OS !== "android") return false;
 
-    // expo-file-system/legacy returns file:// URIs — Android can open them directly
-    const canOpen = await Linking.canOpenURL(localUri);
-    if (canOpen) {
-        await Linking.openURL(localUri);
-    } else {
-        // Fallback: strip file:// prefix for content scheme handling
-        await Linking.openURL(localUri);
+    try {
+        await apkInstaller.apkInstall(localUri);
+        clearPendingInstall();
+        return true;
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (
+            message.toLowerCase().includes("unknown apps") ||
+            message.toLowerCase().includes("not allowed")
+        ) {
+            pendingInstallUri = localUri;
+
+            if (appStateSubscription) {
+                appStateSubscription.remove();
+                appStateSubscription = null;
+            }
+
+            appStateSubscription = AppState.addEventListener("change", async (nextState) => {
+                if (nextState === "active" && pendingInstallUri) {
+                    const uriToInstall = pendingInstallUri;
+                    clearPendingInstall();
+
+                    try {
+                        await apkInstaller.apkInstall(uriToInstall);
+                        options?.onAutoInstallSuccess?.();
+                    } catch (err) {
+                        options?.onAutoInstallError?.(err);
+                    }
+                }
+            });
+
+            try {
+                await apkInstaller.openInstallSettings();
+            } catch {
+                // Suppress settings open errors
+            }
+            return false;
+        }
+
+        // Suppress any non-fatal native module error logs since installer intent is handled
+        return false;
     }
 }
 
@@ -241,3 +347,5 @@ export function formatBytes(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+

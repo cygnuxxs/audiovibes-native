@@ -1,0 +1,26 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "installer"
+  ],
+  "ios": {
+    "iosModuleName": "NitroInstaller"
+  },
+  "android": {
+    "androidNamespace": [
+      "installer"
+    ],
+    "androidCxxLibName": "NitroInstaller"
+  },
+  "autolinking": {
+    "Installer": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridInstaller"
+      }
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

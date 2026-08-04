@@ -6,6 +6,9 @@
       "@/*": [
         "./src/*"
       ],
+      "@cygnuxxs/apkinstaller": [
+        "./installer/src/index.ts"
+      ],
       "@cygnuxxs/writer": [
         "./writer/src/index.ts"
       ],

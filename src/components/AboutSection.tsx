@@ -35,17 +35,20 @@ type UpdateStatus =
     | "up-to-date"
     | "update-available"
     | "downloading"
-    | "done";
+    | "installer-opening"
+    | "installer-opened";
 
 export function AboutSection() {
     const activeColors = useActiveColors();
     const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+    const updateCheckVersion = __DEV__ ? "1.0.0" : appVersion;
+    // const updateCheckVersion = "1.0.0";
 
     // ── state ──────────────────────────────────────────────────────────────
     const [status, setStatus] = useState<UpdateStatus>("idle");
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [downloadProgress, setDownloadProgress] = useState(0); // 0–1
-    const downloadProgressAnim = useRef(new Animated.Value(0)).current;
+    const [downloadProgressAnim] = useState(() => new Animated.Value(0));
 
     // ── animations ─────────────────────────────────────────────────────────
     const [spinValue] = useState(() => new Animated.Value(0));
@@ -94,7 +97,7 @@ export function AboutSection() {
         setDownloadProgress(0);
 
         try {
-            const info = await checkForGithubUpdate();
+            const info = await checkForGithubUpdate(updateCheckVersion);
             setUpdateInfo(info);
 
             if (info.available) {
@@ -112,34 +115,57 @@ export function AboutSection() {
             setStatus("idle");
             toast.error(e?.message ?? "Couldn't check for updates");
         }
-    }, [isLoading]);
+    }, [isLoading, updateCheckVersion]);
 
     // ── download & install APK ─────────────────────────────────────────────
     const handleDownloadUpdate = useCallback(async () => {
         if (!updateInfo?.apkAsset || isLoading) return;
 
-        const { apkAsset, release } = updateInfo;
+        const { apkAsset } = updateInfo;
         const fileName = apkAsset.name || `audiovibes-${updateInfo.latestVersion}.apk`;
 
         setStatus("downloading");
         setDownloadProgress(0);
 
         try {
-            const { localUri } = await downloadApk(
+            const { localUri, isCached } = await downloadApk(
                 apkAsset.browser_download_url,
                 fileName,
-                (progress) => setDownloadProgress(progress)
+                (progress) => setDownloadProgress(progress),
+                apkAsset.size
             );
 
             setDownloadProgress(1);
-            setStatus("done");
+            setStatus("installer-opening");
 
-            toast.success("Download complete! Installing…", {
+            toast.success(isCached ? "Using cached update! Opening installer…" : "Download complete! Installing…", {
                 duration: 4000,
             });
 
             // Small delay so the toast is visible before the installer opens
-            setTimeout(() => installApk(localUri), 800);
+            setTimeout(() => {
+                void installApk(localUri, {
+                    onAutoInstallSuccess: () => {
+                        setStatus("installer-opened");
+                        toast.success("Installer opened", { duration: 2500 });
+                    },
+                    onAutoInstallError: () => {
+                        setStatus("update-available");
+                    },
+                }).then((installed) => {
+                    if (installed) {
+                        setStatus("installer-opened");
+                        toast.success("Installer opened", { duration: 2500 });
+                    } else {
+                        setStatus("update-available");
+                        toast("Permission needed", {
+                            description: "Enable 'Install unknown apps' permission then return to app.",
+                        });
+                    }
+                }).catch(() => {
+                    setStatus("update-available");
+                });
+            }, 800);
         } catch (e: any) {
             setStatus("update-available");
             toast.error(e?.message ?? "Download failed. Please try again.");
@@ -153,25 +179,40 @@ export function AboutSection() {
         "up-to-date": "Up to date",
         "update-available": `Download v${updateInfo?.latestVersion ?? ""}`,
         downloading: `${Math.round(downloadProgress * 100)}%`,
-        done: "Installed!",
+        "installer-opening": "Opening…",
+        "installer-opened": "Installer opened",
     }[status];
 
-    const ButtonIcon = () => {
-        if (status === "up-to-date")
-            return <CheckCircle size={14} color={activeColors["--primary"]} />;
-        if (status === "update-available" || status === "done")
-            return <Download size={14} color={activeColors["--primary"]} />;
-        return (
+    const buttonIcon =
+        status === "up-to-date" ? (
+            <CheckCircle size={14} color={activeColors["--primary"]} />
+        ) : status === "update-available" ||
+            status === "installer-opening" ||
+            status === "installer-opened" ? (
+            <Download size={14} color={activeColors["--primary"]} />
+        ) : (
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
                 <RefreshCcw size={14} color={activeColors["--primary"]} />
             </Animated.View>
         );
-    };
 
     const handleButtonPress = () => {
-        if (status === "update-available") return handleDownloadUpdate();
+        if (status === "update-available" || status === "installer-opened") return handleDownloadUpdate();
         if (status === "idle" || status === "up-to-date") return handleCheckUpdates();
     };
+
+    const progressLabel =
+        status === "installer-opened"
+            ? "Installer opened"
+            : status === "installer-opening"
+                ? "Opening installer"
+                : status === "downloading"
+                    ? updateInfo?.apkAsset
+                        ? `${formatBytes(
+                            Math.round(downloadProgress * updateInfo.apkAsset.size)
+                        )} / ${formatBytes(updateInfo.apkAsset.size)}`
+                        : "Downloading…"
+                    : "";
 
     return (
         <SettingsSection
@@ -207,14 +248,14 @@ export function AboutSection() {
                 {/* Update button */}
                 <Pressable
                     onPress={handleButtonPress}
-                    disabled={isLoading || status === "done"}
+                    disabled={isLoading}
                     accessibilityRole="button"
                     accessibilityState={{ busy: isLoading }}
                     accessibilityLabel="Check for app updates"
-                    className={`flex-row items-center gap-2 px-3.5 py-2.5 rounded-xl border border-border/50 bg-card active:bg-muted/60 ${isLoading || status === "done" ? "opacity-60" : ""
+                    className={`flex-row items-center gap-2 px-3.5 py-2.5 rounded-xl border border-border/50 bg-card active:bg-muted/60 ${isLoading ? "opacity-60" : ""
                         }`}
                 >
-                    <ButtonIcon />
+                    {buttonIcon}
                     <Text
                         className="text-xs font-semibold"
                         style={{ color: activeColors["--primary"] }}
@@ -225,7 +266,7 @@ export function AboutSection() {
             </View>
 
             {/* ── Download progress bar ───────────────────────────────────── */}
-            {(status === "downloading" || status === "done") && (
+            {(status === "downloading" || status === "installer-opening" || status === "installer-opened") && (
                 <View className="px-4 pb-4">
                     {/* Rail */}
                     <View
@@ -248,16 +289,7 @@ export function AboutSection() {
                     {/* Labels */}
                     <View className="flex-row justify-between mt-1.5">
                         <Text className="text-muted-foreground text-[10px]">
-                            {status === "done"
-                                ? "Download complete"
-                                : updateInfo?.apkAsset
-                                    ? `${formatBytes(
-                                        Math.round(
-                                            downloadProgress *
-                                            updateInfo.apkAsset.size
-                                        )
-                                    )} / ${formatBytes(updateInfo.apkAsset.size)}`
-                                    : "Downloading…"}
+                            {progressLabel}
                         </Text>
                         <Text
                             className="text-[10px] font-semibold"
@@ -275,7 +307,7 @@ export function AboutSection() {
                 updateInfo.release.body.trim().length > 0 && (
                     <View className="mx-4 mb-4 p-3 rounded-xl border border-border/40 bg-muted/20">
                         <Text className="text-xs font-semibold text-card-foreground mb-1">
-                            What's new in v{updateInfo.latestVersion}
+                            What&apos;s new in v{updateInfo.latestVersion}
                         </Text>
                         <Text
                             className="text-muted-foreground text-[11px] leading-5"
