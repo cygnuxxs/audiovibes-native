@@ -24,7 +24,7 @@ export default function FloatingPlayer() {
   const activeMedia = useActiveMediaItem();
   const activeTrack = useAudioStore((s) => s.activeTrack);
   const isPlaying = useIsPlaying();
-  const progress = useProgress(500);
+  const progress = useProgress(0.5);
   const rotation = useSharedValue(0);
 
   const displayMedia = activeMedia || activeTrack;

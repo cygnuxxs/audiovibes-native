@@ -1,7 +1,7 @@
 {
   "name": "audiovibes",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.10.1",
   "overrides": {
     "lightningcss": "1.30.1"
   },

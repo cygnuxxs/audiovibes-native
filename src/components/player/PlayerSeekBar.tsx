@@ -1,35 +1,30 @@
-import { useCallback } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { View, StyleSheet } from "react-native";
 import { Text } from "@/components/ui/text";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  useAnimatedProps,
   useAnimatedStyle,
+  useDerivedValue,
+  useAnimatedReaction,
   withSpring,
   withTiming,
-  runOnJS,
-  SharedValue,
+  useSharedValue,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import { clampRatio, formatDisplayTime } from "@/lib/playerUtils";
 import { useActiveColors } from "@/hooks/useActiveColors";
+import { useAudioStore } from "@/hooks/useAudioStore";
 
 const THUMB_SIZE = 14;
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 interface PlayerSeekBarProps {
-  positionSV: SharedValue<number>;
-  durationSV: SharedValue<number>;
-  sliderWidth: SharedValue<number>;
-  isSeeking: SharedValue<boolean>;
+  currentPosition: number;
   totalDuration: number;
   onSeek: (position: number) => void;
 }
 
 export function PlayerSeekBar({
-  positionSV,
-  durationSV,
-  sliderWidth,
-  isSeeking,
+  currentPosition,
   totalDuration,
   onSeek,
 }: PlayerSeekBarProps) {
@@ -39,69 +34,141 @@ export function PlayerSeekBar({
   const border = activeColors["--border"];
   const mutedFg = activeColors["--muted-foreground"];
 
+  const storePosition = useAudioStore((s) => s.position);
+  const storeDuration = useAudioStore((s) => s.duration);
+
+  const sliderWidth = useSharedValue(1);
+  const isSeeking = useSharedValue(false);
+  const seekPositionSV = useSharedValue(currentPosition);
+  const durationSV = useSharedValue(
+    storeDuration > 0 ? storeDuration : totalDuration
+  );
+
+  // Fixes the original freeze: worklets now always read a live duration
+  // instead of a stale closed-over `totalDuration` prop.
+  useEffect(() => {
+    const nextDuration = storeDuration > 0 ? storeDuration : totalDuration;
+    if (nextDuration > 0) {
+      durationSV.value = nextDuration;
+    }
+  }, [storeDuration, totalDuration]);
+
+  useEffect(() => {
+    if (isSeeking.value) return;
+    const pos = storePosition > 0 ? storePosition : currentPosition;
+    seekPositionSV.value = pos;
+  }, [currentPosition, storePosition]);
+
+  const ratioSV = useDerivedValue(() => {
+    const dur = durationSV.value > 0 ? durationSV.value : 1;
+    return clampRatio(seekPositionSV.value / dur);
+  });
+
+  const [displayPosition, setDisplayPosition] = useState(currentPosition);
+  useAnimatedReaction(
+    () => seekPositionSV.value,
+    (pos, prevPos) => {
+      if (prevPos === null || Math.abs(pos - prevPos) >= 0.2) {
+        scheduleOnRN(setDisplayPosition, pos);
+      }
+    },
+    []
+  );
+
+  const handleSeekEnd = useCallback(
+    (finalPos: number) => {
+      onSeek(finalPos);
+    },
+    [onSeek]
+  );
+
+  const updateSeekFromX = (x: number) => {
+    "worklet";
+    const width = sliderWidth.value > 0 ? sliderWidth.value : 1;
+    const dur = durationSV.value > 0 ? durationSV.value : 1;
+    const ratio = clampRatio(x / width);
+    seekPositionSV.value = ratio * dur;
+  };
+
   const panGesture = Gesture.Pan()
     .onBegin((e) => {
       "worklet";
       isSeeking.value = true;
-      const ratio = clampRatio(e.x / sliderWidth.value);
-      positionSV.value = ratio * durationSV.value;
+      updateSeekFromX(e.x);
     })
     .onUpdate((e) => {
       "worklet";
-      const ratio = clampRatio(e.x / sliderWidth.value);
-      positionSV.value = ratio * durationSV.value;
+      updateSeekFromX(e.x);
     })
     .onEnd((e) => {
       "worklet";
+      updateSeekFromX(e.x);
       isSeeking.value = false;
-      const ratio = clampRatio(e.x / sliderWidth.value);
-      const finalPosition = ratio * durationSV.value;
-      positionSV.value = finalPosition;
-      runOnJS(onSeek)(finalPosition);
+      scheduleOnRN(handleSeekEnd, seekPositionSV.value);
+    })
+    .onFinalize(() => {
+      "worklet";
+      isSeeking.value = false;
     });
+
+  const tapGesture = Gesture.Tap()
+    .onBegin((e) => {
+      "worklet";
+      isSeeking.value = true;
+      updateSeekFromX(e.x);
+    })
+    .onEnd((e) => {
+      "worklet";
+      updateSeekFromX(e.x);
+      isSeeking.value = false;
+      scheduleOnRN(handleSeekEnd, seekPositionSV.value);
+    })
+    .onFinalize(() => {
+      "worklet";
+      isSeeking.value = false;
+    });
+
+  const combinedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
   const onSliderLayout = useCallback(
     (e: any) => {
-      sliderWidth.value = e.nativeEvent.layout.width || 1;
+      const w = e.nativeEvent.layout.width;
+      if (w > 0) {
+        sliderWidth.value = w;
+      }
     },
     [sliderWidth]
   );
 
-  const fillStyle = useAnimatedStyle(() => {
-    const ratio = durationSV.value > 0 ? clampRatio(positionSV.value / durationSV.value) : 0;
-    return { width: `${ratio * 100}%` };
-  });
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${ratioSV.value * 100}%`,
+  }));
 
   const thumbStyle = useAnimatedStyle(() => {
-    const ratio = durationSV.value > 0 ? clampRatio(positionSV.value / durationSV.value) : 0;
+    const width = sliderWidth.value > 0 ? sliderWidth.value : 1;
     return {
-      left: ratio * sliderWidth.value - THUMB_SIZE / 2,
+      left: ratioSV.value * width - THUMB_SIZE / 2,
       opacity: withTiming(isSeeking.value ? 1 : 0.6, { duration: 150 }),
       transform: [{ scale: withSpring(isSeeking.value ? 1.3 : 0.8) }],
     };
   });
 
-  const animatedTimeProps = useAnimatedProps(() => {
-    const timeText = formatDisplayTime(positionSV.value);
-    return { text: timeText, defaultValue: timeText } as any;
-  });
-
   return (
     <View className="mt-4 px-8">
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={combinedGesture}>
         <View onLayout={onSliderLayout} style={styles.sliderHitArea} collapsable={false}>
-          {/* Track background */}
           <View style={[styles.sliderTrack, { backgroundColor: border }]}>
-            {/* Filled portion uses --primary for theme accent */}
             <Animated.View style={[styles.sliderFill, { backgroundColor: primary }, fillStyle]} />
           </View>
-          {/* Thumb — uses foreground color */}
           <Animated.View
             style={[
               styles.thumb,
               {
                 backgroundColor: fg,
-                top: styles.sliderHitArea.paddingVertical - THUMB_SIZE / 2 + styles.sliderTrack.height / 2,
+                top:
+                  styles.sliderHitArea.paddingVertical -
+                  THUMB_SIZE / 2 +
+                  styles.sliderTrack.height / 2,
                 width: THUMB_SIZE,
                 height: THUMB_SIZE,
                 borderRadius: THUMB_SIZE / 2,
@@ -113,16 +180,14 @@ export function PlayerSeekBar({
       </GestureDetector>
 
       <View className="flex-row justify-between mt-2">
-        <AnimatedTextInput
-          editable={false}
-          animatedProps={animatedTimeProps}
-          style={[styles.timeLabel, { color: mutedFg }]}
-        />
+        <Text style={[styles.timeLabel, { color: mutedFg }]}>
+          {formatDisplayTime(displayPosition)}
+        </Text>
         <Text
           className="text-[11px]"
           style={[styles.timeLabelBase, { color: mutedFg, opacity: 0.9 }]}
         >
-          {formatDisplayTime(totalDuration)}
+          {formatDisplayTime(storeDuration > 0 ? storeDuration : totalDuration)}
         </Text>
       </View>
     </View>

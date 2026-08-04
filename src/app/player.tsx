@@ -25,28 +25,24 @@ export default function PlayerScreen() {
 
   const activeMedia = useActiveMediaItem();
   const isPlaying = useIsPlaying();
-  const progress = useProgress(250);
-  const audioStore = useAudioStore();
+  const progress = useProgress(0.25);
+  // Selectors for store access to avoid re-render loops from reading the whole store object
+  const storedActiveTrack = useAudioStore((s) => s.activeTrack);
+  const setPosition = useAudioStore((s) => s.setPosition);
+  const setDuration = useAudioStore((s) => s.setDuration);
+  const setPlaying = useAudioStore((s) => s.setPlaying);
+  const storePosition = useAudioStore((s) => s.position);
+  const storeDuration = useAudioStore((s) => s.duration);
+  const storeIsPlaying = useAudioStore((s) => s.isPlaying);
 
-  // Shared values passed down to PlayerSeekBar
-  const positionSV = useSharedValue(0);
-  const durationSV = useSharedValue(0);
-  const sliderWidth = useSharedValue(1);
-  const isSeeking = useSharedValue(false);
+  const displayMedia = activeMedia || storedActiveTrack;
+  const track = storedActiveTrack;
 
-  // Sync JS progress → shared values (only when not seeking)
-  useEffect(() => {
-    if (!isSeeking.value) {
-      positionSV.value = progress.position;
-    }
-  }, [progress.position, isSeeking]);
-
-  useEffect(() => {
-    durationSV.value = progress.duration;
-  }, [progress.duration, durationSV]);
-
-  const displayMedia = activeMedia || audioStore.activeTrack;
-  const track = audioStore.activeTrack;
+  const fallbackDuration =
+    Number((track as any)?.duration) ||
+    Number((displayMedia as any)?.duration) ||
+    0;
+  const duration = progress.duration > 0 ? progress.duration : fallbackDuration;
 
   const handlePlayPause = useCallback(async () => {
     if (isPlaying) {
@@ -59,6 +55,25 @@ export default function PlayerScreen() {
   const handleSeek = useCallback((position: number) => {
     TrackPlayer.seekTo(position);
   }, []);
+
+  // Mirror live progress into the central audio store so UI components can subscribe.
+  useEffect(() => {
+    const pos = progress.position ?? 0;
+    const dur = progress.duration > 0 ? progress.duration : fallbackDuration;
+    const playing = !!isPlaying;
+
+    // Only update the store when values meaningfully change to avoid update loops.
+    const POS_THRESHOLD = 0.05; // seconds
+    if (Math.abs((storePosition ?? 0) - pos) > POS_THRESHOLD) {
+      setPosition(pos);
+    }
+    if (Math.abs((storeDuration ?? 0) - dur) > 0.1) {
+      setDuration(dur);
+    }
+    if ((storeIsPlaying ?? false) !== playing) {
+      setPlaying(playing);
+    }
+  }, [progress.position, progress.duration, isPlaying, fallbackDuration, storePosition, storeDuration, storeIsPlaying, setPosition, setDuration, setPlaying]);
 
   // ── Derived metadata ────────────────────────────────────────────────────────
   const artworkUri = (displayMedia as any)?.artworkUrl || (displayMedia as any)?.artwork;
@@ -76,7 +91,6 @@ export default function PlayerScreen() {
   const isExplicit = track?.explicit_content === "true" || track?.explicit_content === "1";
   const copyright = track?.copyright_text;
   const artists = track?.artists ?? [];
-  const duration = progress.duration;
 
   const chips: { icon: any; label: string; value: string }[] = [];
   if (album) chips.push({ icon: Disc3, label: "Album", value: album });
@@ -119,10 +133,7 @@ export default function PlayerScreen() {
         />
 
         <PlayerSeekBar
-          positionSV={positionSV}
-          durationSV={durationSV}
-          sliderWidth={sliderWidth}
-          isSeeking={isSeeking}
+          currentPosition={progress.position}
           totalDuration={duration}
           onSeek={handleSeek}
         />

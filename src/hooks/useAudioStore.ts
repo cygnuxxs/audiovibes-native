@@ -27,11 +27,21 @@ interface AudioState {
   pause: () => Promise<void>;
   toggle: (track: Track) => Promise<void>;
   seekTo: (seconds: number) => Promise<void>;
+  // Progress fields
+  position: number; // seconds
+  duration: number; // seconds
+  isPlaying: boolean;
+  setPosition: (pos: number) => void;
+  setDuration: (dur: number) => void;
+  setPlaying: (playing: boolean) => void;
 }
 
 export const useAudioStore = create<AudioState>((set, get) => {
   return {
     activeTrack: null,
+    position: 0,
+    duration: 0,
+    isPlaying: false,
     play: async (track) => {
       const currentTrack = TrackPlayer.getActiveMediaItem();
 
@@ -42,6 +52,7 @@ export const useAudioStore = create<AudioState>((set, get) => {
           title: track.title || "Unknown Title",
           artist: track.artist || "Unknown Artist",
           artworkUrl: track.artwork,
+          duration: (track as any).duration ? Number((track as any).duration) : undefined,
         });
       }
 
@@ -64,6 +75,7 @@ export const useAudioStore = create<AudioState>((set, get) => {
           title: track.title || "Unknown Title",
           artist: track.artist || "Unknown Artist",
           artworkUrl: track.artwork,
+          duration: (track as any).duration ? Number((track as any).duration) : undefined,
         });
 
         set({ activeTrack: track });
@@ -92,5 +104,10 @@ export const useAudioStore = create<AudioState>((set, get) => {
     seekTo: async (seconds) => {
       TrackPlayer.seekTo(seconds);
     },
+
+    // Progress setters
+    setPosition: (pos: number) => set({ position: pos }),
+    setDuration: (dur: number) => set({ duration: dur }),
+    setPlaying: (playing: boolean) => set({ isPlaying: playing }),
   };
 });
