@@ -1,6 +1,7 @@
 import { File, Paths } from "expo-file-system";
 import { Platform, AppState } from "react-native";
 import Constants from "expo-constants";
+import * as Application from "expo-application";
 import { apkInstaller } from "@cygnuxxs/apkinstaller";
 
 const GITHUB_REPO = "cygnuxxs/audiovibes-native";
@@ -131,15 +132,36 @@ export function selectMatchingApkAsset(assets: GithubAsset[]): GithubAsset | und
 }
 
 /**
+ * Normalizes a version string for comparison:
+ * - trims whitespace
+ * - strips a leading "v"/"V" (e.g. "v1.2.0" -> "1.2.0")
+ * - drops pre-release/build metadata (e.g. "1.2.0-rc.1" -> "1.2.0", "1.2.0+42" -> "1.2.0")
+ */
+export function normalizeVersion(v: string | null | undefined): string {
+    if (!v) return "0.0.0";
+    return v.trim().replace(/^[vV]/, "").split(/[-+]/)[0];
+}
+
+/**
  * Compares two semver-like version strings (e.g. "1.10.0" vs "1.11.0").
  * Returns true if `latest` is strictly newer than `current`.
+ * Versions are normalized before comparing, so "v1.2.0", "1.2.0", and
+ * "1.2.0+build" are all treated as equal.
  */
 export function isNewerVersion(current: string, latest: string): boolean {
-    const clean = (v: string) => v.replace(/^v/, "").trim();
-    const toNumbers = (v: string) => clean(v).split(".").map((n) => parseInt(n, 10) || 0);
+    const normCurrent = normalizeVersion(current);
+    const normLatest = normalizeVersion(latest);
 
-    const cur = toNumbers(current);
-    const lat = toNumbers(latest);
+    // Fast path: identical after normalization -> definitely not newer.
+    // This is the key fix: previously subtle mismatches (casing, "v" prefix,
+    // pre-release suffixes, whitespace) could cause this check to be skipped
+    // and fall through to a numeric comparison that produced a false positive.
+    if (normCurrent === normLatest) return false;
+
+    const toNumbers = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
+
+    const cur = toNumbers(normCurrent);
+    const lat = toNumbers(normLatest);
     const len = Math.max(cur.length, lat.length);
 
     for (let i = 0; i < len; i++) {
@@ -152,11 +174,32 @@ export function isNewerVersion(current: string, latest: string): boolean {
 }
 
 /**
+ * Resolves the currently installed app version.
+ * Prefers `expo-application`'s nativeApplicationVersion, which reliably
+ * reflects the version baked into standalone/production builds.
+ * Falls back to Constants.expoConfig?.version (more reliable in dev/Expo Go),
+ * then to the provided override, then to "1.0.0".
+ */
+export function getCurrentAppVersion(override?: string): string {
+    if (override) return override;
+
+    const nativeVersion = Application.nativeApplicationVersion;
+    if (nativeVersion) return nativeVersion;
+
+    const expoConfigVersion = Constants.expoConfig?.version;
+    if (expoConfigVersion) return expoConfigVersion;
+
+    return "1.0.0";
+}
+
+/**
  * Fetches the latest GitHub release and compares it against the installed version.
  */
 export async function checkForGithubUpdate(
-    currentVersion = Constants.expoConfig?.version ?? "1.0.0"
+    currentVersion?: string
 ): Promise<UpdateInfo> {
+    const resolvedCurrentVersion = getCurrentAppVersion(currentVersion);
+
     const response = await fetch(RELEASES_API, {
         headers: { Accept: "application/vnd.github+json" },
     });
@@ -166,15 +209,23 @@ export async function checkForGithubUpdate(
     }
 
     const release: GithubRelease = await response.json();
-    const latestVersion = release.tag_name.replace(/^v/, "");
+    const latestVersion = normalizeVersion(release.tag_name);
+    const normalizedCurrent = normalizeVersion(resolvedCurrentVersion);
 
-    const available = isNewerVersion(currentVersion, latestVersion);
+    const available = isNewerVersion(normalizedCurrent, latestVersion);
     const deviceArch = getDeviceArchitecture();
 
     // Find matching APK asset for mobile architecture
     const apkAsset = selectMatchingApkAsset(release.assets);
 
-    return { available, release, apkAsset, currentVersion, latestVersion, deviceArch };
+    return {
+        available,
+        release,
+        apkAsset,
+        currentVersion: normalizedCurrent,
+        latestVersion,
+        deviceArch,
+    };
 }
 
 export interface DownloadApkResult {
@@ -347,5 +398,3 @@ export function formatBytes(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-
