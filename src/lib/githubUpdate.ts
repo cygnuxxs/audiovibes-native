@@ -155,7 +155,7 @@ export function isNewerVersion(current: string, latest: string): boolean {
  * Fetches the latest GitHub release and compares it against the installed version.
  */
 export async function checkForGithubUpdate(
-    currentVersion = "1.0.1"
+    currentVersion = Constants.expoConfig?.version ?? "1.0.0"
 ): Promise<UpdateInfo> {
     const response = await fetch(RELEASES_API, {
         headers: { Accept: "application/vnd.github+json" },

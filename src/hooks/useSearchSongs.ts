@@ -8,9 +8,9 @@ export function useSearchSongs(query: string) {
     enabled: query.trim().length > 0,
 
     // Cache for 5 minutes
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 60 * 5,
 
     // Keep unused cache for 30 minutes
-    gcTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
   });
 }

@@ -97,7 +97,8 @@
     "lint": "expo lint",
     "publish": "node scripts/publish.js",
     "build:android:apk": "cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a",
-    "build:android:aab": "cd android && ./gradlew bundleRelease"
+    "build:android:aab": "cd android && ./gradlew bundleRelease",
+    "android:install": "adb install ./android/app/build/outputs/apk/release/audiovibes-arm64-v8a.apk"
   },
   "private": true
 }
