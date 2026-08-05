@@ -45,7 +45,6 @@ export function getDeviceArchitecture(): DeviceArchInfo {
     const platformConstants = (Platform.constants || {}) as {
         SUPPORTED_ABIS?: string[];
         SUPPORTED_64_BIT_ABIS?: string[];
-        SUPPORTED_32_BIT_ABIS?: string[];
     };
 
     const supportedAbis = platformConstants.SUPPORTED_ABIS || [];
@@ -54,21 +53,15 @@ export function getDeviceArchitecture(): DeviceArchInfo {
     let primaryAbi = supportedAbis[0] || "";
 
     if (!primaryAbi && Constants.systemArchitectures) {
-        if (Array.isArray(Constants.systemArchitectures)) {
-            primaryAbi = Constants.systemArchitectures[0] || "";
-        } else if (typeof Constants.systemArchitectures === "string") {
-            primaryAbi = Constants.systemArchitectures;
-        }
+        primaryAbi = Array.isArray(Constants.systemArchitectures)
+            ? Constants.systemArchitectures[0] || ""
+            : typeof Constants.systemArchitectures === "string"
+              ? Constants.systemArchitectures
+              : "";
     }
 
-    const abiLower = primaryAbi.toLowerCase();
-
-    const is64Bit =
-        supported64.length > 0 ||
-        abiLower.includes("64") ||
-        abiLower.includes("arm64") ||
-        abiLower.includes("aarch64") ||
-        abiLower.includes("x86_64");
+    // "64" covers arm64, aarch64, x86_64 — no separate checks needed
+    const is64Bit = supported64.length > 0 || primaryAbi.toLowerCase().includes("64");
 
     return {
         primaryAbi: primaryAbi || (is64Bit ? "arm64-v8a" : "armeabi-v7a"),
@@ -142,26 +135,29 @@ export function normalizeVersion(v: string | null | undefined): string {
     return v.trim().replace(/^[vV]/, "").split(/[-+]/)[0];
 }
 
+const toSegments = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
+
 /**
  * Compares two semver-like version strings (e.g. "1.10.0" vs "1.11.0").
  * Returns true if `latest` is strictly newer than `current`.
  * Versions are normalized before comparing, so "v1.2.0", "1.2.0", and
  * "1.2.0+build" are all treated as equal.
+ *
+ * If `preNormalized` is true, skips redundant normalizeVersion calls —
+ * use when caller already normalized both strings.
  */
-export function isNewerVersion(current: string, latest: string): boolean {
-    const normCurrent = normalizeVersion(current);
-    const normLatest = normalizeVersion(latest);
+export function isNewerVersion(
+    current: string,
+    latest: string,
+    preNormalized = false
+): boolean {
+    const normCurrent = preNormalized ? current : normalizeVersion(current);
+    const normLatest = preNormalized ? latest : normalizeVersion(latest);
 
-    // Fast path: identical after normalization -> definitely not newer.
-    // This is the key fix: previously subtle mismatches (casing, "v" prefix,
-    // pre-release suffixes, whitespace) could cause this check to be skipped
-    // and fall through to a numeric comparison that produced a false positive.
     if (normCurrent === normLatest) return false;
 
-    const toNumbers = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
-
-    const cur = toNumbers(normCurrent);
-    const lat = toNumbers(normLatest);
+    const cur = toSegments(normCurrent);
+    const lat = toSegments(normLatest);
     const len = Math.max(cur.length, lat.length);
 
     for (let i = 0; i < len; i++) {
@@ -212,19 +208,16 @@ export async function checkForGithubUpdate(
     const latestVersion = normalizeVersion(release.tag_name);
     const normalizedCurrent = normalizeVersion(resolvedCurrentVersion);
 
-    const available = isNewerVersion(normalizedCurrent, latestVersion);
-    const deviceArch = getDeviceArchitecture();
-
-    // Find matching APK asset for mobile architecture
-    const apkAsset = selectMatchingApkAsset(release.assets);
+    // Already normalized — skip redundant work inside isNewerVersion
+    const available = isNewerVersion(normalizedCurrent, latestVersion, true);
 
     return {
         available,
         release,
-        apkAsset,
+        apkAsset: selectMatchingApkAsset(release.assets),
         currentVersion: normalizedCurrent,
         latestVersion,
-        deviceArch,
+        deviceArch: getDeviceArchitecture(),
     };
 }
 
@@ -234,16 +227,19 @@ export interface DownloadApkResult {
 }
 
 /**
+ * Validates cached file size matches expected bytes (if provided).
+ */
+function isCacheSizeValid(file: File, expectedBytes?: number): boolean {
+    return !expectedBytes || expectedBytes <= 0 || !file.size || file.size === expectedBytes;
+}
+
+/**
  * Checks whether an APK with the given filename is already cached.
  */
 export function isApkCached(fileName: string, expectedBytes?: number): boolean {
     try {
         const destination = new File(Paths.cache, fileName);
-        if (!destination.exists) return false;
-        if (expectedBytes && expectedBytes > 0 && destination.size && destination.size !== expectedBytes) {
-            return false;
-        }
-        return true;
+        return destination.exists && isCacheSizeValid(destination, expectedBytes);
     } catch {
         return false;
     }
@@ -278,13 +274,7 @@ export async function downloadApk(
     const destination = new File(Paths.cache, fileName);
 
     if (destination.exists) {
-        const matchesSize =
-            !expectedBytes ||
-            expectedBytes <= 0 ||
-            !destination.size ||
-            destination.size === expectedBytes;
-
-        if (matchesSize) {
+        if (isCacheSizeValid(destination, expectedBytes)) {
             onProgress?.(1);
             return { localUri: destination.uri, isCached: true };
         }
@@ -354,16 +344,11 @@ export async function installApk(
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (
-            message.toLowerCase().includes("unknown apps") ||
-            message.toLowerCase().includes("not allowed")
-        ) {
+        const lowerMessage = message.toLowerCase();
+        if (lowerMessage.includes("unknown apps") || lowerMessage.includes("not allowed")) {
+            clearPendingInstall();
             pendingInstallUri = localUri;
 
-            if (appStateSubscription) {
-                appStateSubscription.remove();
-                appStateSubscription = null;
-            }
 
             appStateSubscription = AppState.addEventListener("change", async (nextState) => {
                 if (nextState === "active" && pendingInstallUri) {

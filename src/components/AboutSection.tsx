@@ -41,8 +41,7 @@ type UpdateStatus =
 export function AboutSection() {
     const activeColors = useActiveColors();
     const appVersion = Constants.expoConfig?.version ?? "1.0.0";
-    // const updateCheckVersion = __DEV__ ? "1.0.0" : appVersion;
-    const updateCheckVersion = "1.0.0";
+    const updateCheckVersion = __DEV__ ? "1.0.0" : appVersion;
 
     // ── state ──────────────────────────────────────────────────────────────
     const [status, setStatus] = useState<UpdateStatus>("idle");
