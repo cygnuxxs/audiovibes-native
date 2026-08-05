@@ -2,13 +2,13 @@
 
 # AudioVibes
 
-**Your personal music sanctuary — stream, download, and listen offline with rich metadata.**
+**Stream, download, and listen offline — with rich metadata embedded natively.**
 
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-blue?style=flat-square)](https://expo.dev)
 [![React Native](https://img.shields.io/badge/React%20Native-0.86-61DAFB?style=flat-square&logo=react)](https://reactnative.dev)
 [![Expo](https://img.shields.io/badge/Expo-57-000020?style=flat-square&logo=expo)](https://expo.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat-square&logo=typescript)](https://typescriptlang.org)
-[![NitroModules](https://img.shields.io/badge/Nitro%20Modules-C%2B%2B-EF4444?style=flat-square)](https://nitro.margelo.com)
+[![Nitro Modules](https://img.shields.io/badge/Nitro%20Modules-C%2B%2B-EF4444?style=flat-square)](https://nitro.margelo.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](./LICENSE)
 
 </div>
@@ -17,43 +17,46 @@
 
 ## Overview
 
-AudioVibes is a cross-platform mobile music application built with **React Native + Expo** that lets users search, stream, and download songs with full metadata and album artwork embedded directly into the audio file. It features a **custom native FFmpeg module** (`@cygnuxxs/writer`) built in C++ via Nitro Modules that performs metadata injection without pulling in a full FFmpeg binary — dramatically reducing bundle size and maximising runtime performance.
+AudioVibes is a cross-platform mobile music application built with **React Native + Expo** that lets users search, stream, and download songs with full metadata and album artwork embedded directly into the audio file. It features a **custom native FFmpeg module** (`@cygnuxxs/writer`) implemented in C++ via Nitro Modules — performing metadata injection without pulling in a full FFmpeg binary, which dramatically reduces bundle size and maximises runtime performance.
 
 ---
 
 ## Features
 
-### Music Discovery & Streaming
+### Music Discovery and Streaming
+
 - **Spotlight Search** — macOS-style modal search overlay with debounced input, persistent search history, and instant suggestion filtering
 - **Real-time streaming** — Tap any song to start playback immediately via `@rntp/player` (React Native Track Player)
-- **Floating mini-player** — Always-visible playback controls with track info without interrupting browsing
+- **Floating mini-player** — Always-visible playback controls with track info, without interrupting browsing
 
-### Full-Featured Player Screen
+### Full-Featured Player
+
 - **Large artwork display** — Full-width album art with a blurred background ambient effect
-- **Worklet-powered seek bar** — Gesture-driven progress bar running entirely on the UI thread via `react-native-reanimated` + `react-native-worklets`; JS is only called on seek commit to avoid frame drops
+- **Worklet-powered seek bar** — Gesture-driven progress bar running entirely on the UI thread via `react-native-reanimated` + `react-native-worklets`; JS is only invoked on seek commit to avoid frame drops
 - **Play / Pause toggle** — Instant response with no JS-thread blocking
 
 ### Offline Downloads with Rich Metadata
-- **Parallel download pipeline** — Song audio and album artwork are fetched concurrently (`Promise.all`), cutting wait time nearly in half
-- **Automated metadata injection** — After download, the native `HybridWriter` module remuxes the file and stamps all MP4 tags (title, artist, album, composer, genre, lyrics, BPM, track/disc numbers, copyright, label, encoder, etc.) plus the cover art — all in a single C++ pass
-- **Progress UI** — Animated wave-fill button that mirrors real download progress; spinner icon for the remux phase
+
+- **Parallel download pipeline** — Song audio and album artwork are fetched concurrently via `Promise.all`, cutting wait time nearly in half
+- **Automated metadata injection** — After download, the native `HybridWriter` module remuxes the file and stamps all MP4 tags (title, artist, album, composer, genre, lyrics, BPM, track/disc numbers, copyright, label, encoder, etc.) plus cover art — all in a single C++ pass
+- **Progress UI** — Animated wave-fill button that mirrors real download progress; spinner icon during the remux phase
 - **Android SAF support** — Downloads land in a user-chosen folder via the Android Storage Access Framework; iOS saves to the cache directory automatically
 
-### Theming & Appearance
+### Theming and Appearance
+
 - **Multiple colour themes** — Switchable accent colours with live preview
 - **Light / Dark / System mode** — Fully dynamic, persisted across restarts via `expo-secure-store`
 - **Google Sans typography** — Custom font stack loaded at startup via `expo-font`
 
-### Settings & Storage
-- **Storage management panel** — Shows cache usage, lets users clear cached files
-- **About & diagnostics** — App version, build info, and native module details exposed in-app
+### Settings and Storage
 
-###  Toast Notifications
-- **Sonner-native toasts** — Non-blocking success / error / info messages themed to the active colour scheme
+- **Storage management panel** — Shows cache usage; lets users clear cached files
+- **About and diagnostics** — App version, build info, and native module details exposed in-app
+- **Toast notifications** — Non-blocking success / error / info messages themed to the active colour scheme via Sonner Native
 
 ---
 
-##  Architecture
+## Architecture
 
 ```
 audiovibes/
@@ -100,9 +103,20 @@ audiovibes/
 
 ---
 
-## ⚡ Native Module: `@cygnuxxs/writer` (HybridWriter)
+## Native Modules
 
-This is the centrepiece of AudioVibes — a **custom Nitro Module** implemented in C++ that provides zero-overhead audio metadata injection using a purpose-built, stripped-down FFmpeg build.
+AudioVibes ships two custom [Nitro Modules](https://nitro.margelo.com) that replace heavyweight third-party libraries with lean, purpose-built native code.
+
+| Module | Package | Language | Purpose |
+|---|---|---|---|
+| [NitroWriter](./writer/README.md) | `@cygnuxxs/writer` | C++ (iOS + Android) | FFmpeg metadata injection + artwork embedding |
+| [NitroInstaller](./installer/README.md) | `@cygnuxxs/apkinstaller` | Kotlin (Android only) | APK self-update via system package-installer intent |
+
+---
+
+## `@cygnuxxs/writer` (HybridWriter)
+
+The centrepiece of AudioVibes — a **custom Nitro Module** implemented in C++ that provides zero-overhead audio metadata injection using a purpose-built, stripped-down FFmpeg build.
 
 ### Why a Custom Native Module?
 
@@ -116,7 +130,7 @@ Standard React Native FFmpeg wrappers ship the **full FFmpeg binary** — encode
 
 Everything else — filters, hardware decoders, network protocols, encoders — is stripped at compile time, yielding a **~4–6 MB static library** per ABI instead of the typical 20+ MB.
 
-### How It Works — Step by Step
+### How It Works
 
 #### 1. TypeScript Interface (`Writer.nitro.ts`)
 
@@ -217,7 +231,7 @@ void remuxPackets(AVFormatContext* src, AVFormatContext* dst,
 
 #### 5. Async Promise Bridge — Zero JS-Thread Blocking
 
-All three public methods return Nitro's `Promise<T>`, which runs the lambda on a background thread pool and resolves on the JS thread when done — the JS event loop and the UI thread are never stalled:
+All three public methods return Nitro's `Promise<T>`, which runs the lambda on a background thread pool and resolves on the JS thread when done — the JS event loop and UI thread are never stalled:
 
 ```cpp
 std::shared_ptr<Promise<void>> HybridWriter::writeMetadata(
@@ -225,7 +239,7 @@ std::shared_ptr<Promise<void>> HybridWriter::writeMetadata(
     const Metadata& metadata, const std::optional<std::string>& artwork)
 {
     return Promise<void>::async([=]() {
-        // ← Runs on Nitro's C++ thread pool, never on JS or UI thread
+        // Runs on Nitro's C++ thread pool, never on JS or UI thread
         auto inCtx  = openInput(input);
         auto outCtx = openOutput(output);
         auto indexMap = copyMediaStreams(inCtx.get(), outCtx.get());
@@ -257,13 +271,13 @@ target_link_libraries(${PACKAGE_NAME}
 
 **iOS — `NitroWriter.podspec`**
 
-`add_nitrogen_files(s)` pulls in all generated autolinking code; the pod compiles `cpp/**/*.{hpp,cpp}` directly (no separate pre-built fat library required on iOS because Xcode links against system frameworks):
+`add_nitrogen_files(s)` pulls in all generated autolinking code; the pod compiles `cpp/**/*.{hpp,cpp}` directly:
 
 ```ruby
 s.source_files = [
   "ios/**/*.{swift}",
   "ios/**/*.{m,mm}",
-  "cpp/**/*.{hpp,cpp}",   # ← HybridWriter compiled inline
+  "cpp/**/*.{hpp,cpp}",   # HybridWriter compiled inline
 ]
 load 'nitrogen/generated/ios/NitroWriter+autolinking.rb'
 add_nitrogen_files(s)
@@ -271,7 +285,7 @@ add_nitrogen_files(s)
 
 ---
 
-## 📊 Performance Metrics
+## Performance Metrics
 
 | Metric | AudioVibes | Typical Full FFmpeg Wrapper |
 |---|---|---|
@@ -287,13 +301,13 @@ add_nitrogen_files(s)
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js** ≥ 18
-- **pnpm** ≥ 9
-- **Xcode** ≥ 15 (for iOS builds)
+- **Node.js** >= 18
+- **pnpm** >= 9
+- **Xcode** >= 15 (for iOS builds)
 - **Android Studio** + NDK r26 (for Android builds)
 - An Expo Dev Client build or a physical device
 
@@ -317,13 +331,13 @@ pnpm android        # Run on Android emulator / device
 ### Build Release
 
 ```bash
-pnpm build:android:apk   # Unsigned APK  →  android/app/build/outputs/apk/release/
-pnpm build:android:aab   # App Bundle    →  android/app/build/outputs/bundle/release/
+pnpm build:android:apk   # Unsigned APK  ->  android/app/build/outputs/apk/release/
+pnpm build:android:aab   # App Bundle    ->  android/app/build/outputs/bundle/release/
 ```
 
 ---
 
-## 🧱 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -333,7 +347,7 @@ pnpm build:android:aab   # App Bundle    →  android/app/build/outputs/bundle/r
 | State management | Zustand 5 |
 | Server state / caching | TanStack Query v5 |
 | Audio playback | `@rntp/player` (React Native Track Player) |
-| Native module | Nitro Modules + C++ (`react-native-nitro-modules`) |
+| Native modules | [`@cygnuxxs/writer`](./writer/README.md) — C++ FFmpeg metadata; [`@cygnuxxs/apkinstaller`](./installer/README.md) — Kotlin APK installer |
 | FFmpeg | Custom-compiled static libs (libavformat + libavcodec + libavutil only) |
 | Animations | React Native Reanimated 4 |
 | UI-thread logic | `react-native-worklets` |
@@ -347,7 +361,7 @@ pnpm build:android:aab   # App Bundle    →  android/app/build/outputs/bundle/r
 
 ---
 
-## 📁 Key Files Reference
+## Key Files Reference
 
 | File | Description |
 |---|---|
@@ -362,10 +376,10 @@ pnpm build:android:aab   # App Bundle    →  android/app/build/outputs/bundle/r
 | `src/components/SpotlightSearch.tsx` | Spotlight-style search modal |
 | `src/components/DownloadButton.tsx` | Wave-fill animated download button |
 | `src/components/WelcomeScreen.tsx` | Onboarding + Android SAF setup |
-| `src/store/themeStore.ts` | Theme & dark/light mode persistence |
+| `src/store/themeStore.ts` | Theme + dark/light mode persistence |
 
 ---
 
-## 📄 License
+## License
 
 [MIT](./LICENSE) © cygnuxxs

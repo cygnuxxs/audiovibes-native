@@ -1,43 +1,111 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# ─── Dependencies ────────────────────────────────────────────────────────────
 node_modules/
+.pnpm-store/
 
-# Expo
+# ─── Expo ────────────────────────────────────────────────────────────────────
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# ─── Native (Expo-generated) ─────────────────────────────────────────────────
+/android/
+/ios/
+
+# ─── Gradle / Android build ───────────────────────────────────────────────────
+.gradle/
+.cxx/
+local.properties
+gradle/wrapper/gradle-wrapper.jar
+
+# ─── Native build output ─────────────────────────────────────────────────────
+build/
 .kotlin/
-*.orig.*
+
+# ─── Nitro / native module compiled output ───────────────────────────────────
+writer/lib/
+installer/lib/
+writer/android/build/
+installer/android/build/
+writer/android/.cxx/
+installer/android/.cxx/
+writer/android/.gradle/
+installer/android/.gradle/
+writer/android/local.properties
+installer/android/local.properties
+
+# ─── Compiled lockfiles for sub-packages (root pnpm-lock.yaml is kept) ───────
+writer/package-lock.json
+installer/package-lock.json
+
+# ─── Signing & certificates ──────────────────────────────────────────────────
 *.jks
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
+android/keystores/debug.keystore
 
-# Metro
+# ─── Xcode ───────────────────────────────────────────────────────────────────
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+project.xcworkspace
+
+# ─── Diff / patch artifacts ──────────────────────────────────────────────────
+*.orig.*
+
+# ─── Metro bundler ───────────────────────────────────────────────────────────
 .metro-health-check*
 
-# debug
+# ─── Debug logs ──────────────────────────────────────────────────────────────
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+.eslintcache
 
-# macOS
-.DS_Store
-*.pem
+# ─── Environment ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.venv/
 
-# local env files
-.env*.local
-
-# typescript
+# ─── TypeScript ──────────────────────────────────────────────────────────────
 *.tsbuildinfo
 
-example
+# ─── Cache ───────────────────────────────────────────────────────────────────
+.cache/
+.turbo/
 
-# generated native folders
-/ios
-/android
+# ─── macOS ───────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ─── Editor ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+jsconfig.json
+
+# ─── AI / agent tooling ──────────────────────────────────────────────────────
+.claude/
+skills-lock.json
+
+# ─── Scratch / temp files ────────────────────────────────────────────────────
+test-saf.ts
+example
